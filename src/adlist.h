@@ -31,6 +31,7 @@
 /*
   adlist.h - 一个通用的双端链表的实现
 */
+
 #ifndef __ADLIST_H__
 #define __ADLIST_H__
 

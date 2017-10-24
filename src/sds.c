@@ -445,16 +445,21 @@ void sdsIncrLen(sds s, int incr) {
  *
  * if the specified length is smaller than the current length, no operation
  * is performed. */
-sds sdsgrowzero(sds s, size_t len) {
-    size_t curlen = sdslen(s);
 
-    if (len <= curlen) return s;
-    s = sdsMakeRoomFor(s,len-curlen);
+/* 增长一个sds字符串到一个指定长度。扩充出来的不是原来字符串的空间会被设置为0。ß
+ *
+ * 如果指定的长度比当前长度小，不做任何操作。*/
+sds sdsgrowzero(sds s, size_t len) {
+    size_t curlen = sdslen(s);  // 当前字符串长度
+
+    if (len <= curlen) return s;  // 设置的长度小于当前长度，直接返回原始sds字符串指针
+    s = sdsMakeRoomFor(s,len-curlen);  // 扩充sds
     if (s == NULL) return NULL;
 
     /* Make sure added region doesn't contain garbage */
+    /* 确保新增的区域不包含垃圾数据 */
     memset(s+curlen,0,(len-curlen+1)); /* also set trailing \0 byte */
-    sdssetlen(s, len);
+    sdssetlen(s, len);  // 更新sds字符串header中的len
     return s;
 }
 
@@ -463,14 +468,19 @@ sds sdsgrowzero(sds s, size_t len) {
  *
  * After the call, the passed sds string is no longer valid and all the
  * references must be substituted with the new pointer returned by the call. */
-sds sdscatlen(sds s, const void *t, size_t len) {
-    size_t curlen = sdslen(s);
 
-    s = sdsMakeRoomFor(s,len);
+/* 向指定的sds字符串's'尾部追加由't'指向的二进制安全的字符串，长度'len'字节。
+ *
+ * 调用此函数后，原来作为参数传入的sds字符串的指针不再是有效的，
+ * 所有引用必须被替换为函数返回的新指针。 */
+sds sdscatlen(sds s, const void *t, size_t len) {
+    size_t curlen = sdslen(s);  // 当前字符串长度
+
+    s = sdsMakeRoomFor(s,len);  // 扩充len字节
     if (s == NULL) return NULL;
-    memcpy(s+curlen, t, len);
-    sdssetlen(s, curlen+len);
-    s[curlen+len] = '\0';
+    memcpy(s+curlen, t, len);  // 追加数据到原字符串末尾
+    sdssetlen(s, curlen+len);  // 更新sds字符串header中的len
+    s[curlen+len] = '\0';  // 设置终止符
     return s;
 }
 
@@ -478,6 +488,11 @@ sds sdscatlen(sds s, const void *t, size_t len) {
  *
  * After the call, the passed sds string is no longer valid and all the
  * references must be substituted with the new pointer returned by the call. */
+
+/* 追加指定的C字符串到sds字符串's'的尾部。
+ *
+ * 调用此函数后，原来作为参数传入的sds字符串的指针不再是有效的，
+ * 所有引用必须被替换为函数返回的新指针。 */
 sds sdscat(sds s, const char *t) {
     return sdscatlen(s, t, strlen(t));
 }
@@ -486,25 +501,35 @@ sds sdscat(sds s, const char *t) {
  *
  * After the call, the modified sds string is no longer valid and all the
  * references must be substituted with the new pointer returned by the call. */
+
+/* 追加指定的sds字符串't'到已经存在的sds字符串's'末尾。
+ *
+ * 调用此函数后，原来作为参数传入的sds字符串的指针不再是有效的，
+ * 所有引用必须被替换为函数返回的新指针。 */
 sds sdscatsds(sds s, const sds t) {
     return sdscatlen(s, t, sdslen(t));
 }
 
 /* Destructively modify the sds string 's' to hold the specified binary
  * safe string pointed by 't' of length 'len' bytes. */
+
+/* 把由't'指向的二进制安全的字符串复制到sds字符串's'的内存空间中，长度为'len'，覆盖原来的数据 */
 sds sdscpylen(sds s, const char *t, size_t len) {
     if (sdsalloc(s) < len) {
-        s = sdsMakeRoomFor(s,len-sdslen(s));
+        s = sdsMakeRoomFor(s,len-sdslen(s));  // 原sds总空间不足就扩充
         if (s == NULL) return NULL;
     }
-    memcpy(s, t, len);
-    s[len] = '\0';
-    sdssetlen(s, len);
+    memcpy(s, t, len);  // 将t指向的数据直接覆盖s
+    s[len] = '\0';  // 设置终止符
+    sdssetlen(s, len);  // 更新sds字符串header中的len
     return s;
 }
 
 /* Like sdscpylen() but 't' must be a null-termined string so that the length
  * of the string is obtained with strlen(). */
+
+/* 和sdscpylen()函数类似，但是't'指向的必须是一个以'\0'结尾的字符串，
+ * 所以可以用strlen()获取该字符串长度。 */
 sds sdscpy(sds s, const char *t) {
     return sdscpylen(s, t, strlen(t));
 }

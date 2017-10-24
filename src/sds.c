@@ -296,29 +296,35 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
  *
  * After the call, the passed sds string is no longer valid and all the
  * references must be substituted with the new pointer returned by the call. */
+
+/* 重新分配sds字符串的空间，保证结尾没有空闲空间。其中包含的字符串不变，
+ * 但下一次进行字符串连接操作时需要一次空间重新分配。
+ * 
+ * 调用此函数后，原来作为参数传入的sds字符串的指针不再是有效的，
+ * 所有引用必须被替换为函数返回的新指针。 */
 sds sdsRemoveFreeSpace(sds s) {
     void *sh, *newsh;
     char type, oldtype = s[-1] & SDS_TYPE_MASK;
     int hdrlen;
-    size_t len = sdslen(s);
-    sh = (char*)s-sdsHdrSize(oldtype);
+    size_t len = sdslen(s);  // 字符串真正的长度
+    sh = (char*)s-sdsHdrSize(oldtype);  // 获取sds字符串header指针
 
-    type = sdsReqType(len);
-    hdrlen = sdsHdrSize(type);
-    if (oldtype==type) {
-        newsh = s_realloc(sh, hdrlen+len+1);
+    type = sdsReqType(len);  // 计算字符串的新type
+    hdrlen = sdsHdrSize(type);  // 计算字符串的新header大小
+    if (oldtype==type) {  // 字符串类型不变
+        newsh = s_realloc(sh, hdrlen+len+1);  // realloc，大小更新为：header大小+真实字符串大小+1
         if (newsh == NULL) return NULL;
-        s = (char*)newsh+hdrlen;
-    } else {
-        newsh = s_malloc(hdrlen+len+1);
+        s = (char*)newsh+hdrlen;  // 更新sds字符串指针
+    } else {  // 字符串类型改变
+        newsh = s_malloc(hdrlen+len+1);  // 新开辟一块内存
         if (newsh == NULL) return NULL;
-        memcpy((char*)newsh+hdrlen, s, len+1);
-        s_free(sh);
-        s = (char*)newsh+hdrlen;
-        s[-1] = type;
-        sdssetlen(s, len);
+        memcpy((char*)newsh+hdrlen, s, len+1);  // 复制数据到新内存中
+        s_free(sh);  // 释放原始的sds字符串内存
+        s = (char*)newsh+hdrlen; // 更新sds字符串指针
+        s[-1] = type;  // 更新flags
+        sdssetlen(s, len);  // 更新sds字符串header中的len
     }
-    sdssetalloc(s, len);
+    sdssetalloc(s, len);  // 更新sds字符串header中的alloc
     return s;
 }
 
@@ -329,15 +335,25 @@ sds sdsRemoveFreeSpace(sds s) {
  * 3) The free buffer at the end if any.
  * 4) The implicit null term.
  */
+
+/* 返回指定sds字符串的分配空间大小，
+ * 包括:
+ * 1) sds header大小。
+ * 2) 字符串本身的大小。
+ * 3) 末尾的空闲空间大小（如果有的话）。
+ * 4) 隐式包含的终止符。
+ */
 size_t sdsAllocSize(sds s) {
-    size_t alloc = sdsalloc(s);
-    return sdsHdrSize(s[-1])+alloc+1;
+    size_t alloc = sdsalloc(s);  // 获取sds header的alloc
+    return sdsHdrSize(s[-1])+alloc+1;  // header大小+alloc（字符串大小+空闲空间大小）+1
 }
 
 /* Return the pointer of the actual SDS allocation (normally SDS strings
  * are referenced by the start of the string buffer). */
+
+/* 返回sds分配空间的首地址（一般来说sds字符串的指针是其字符串缓冲区的首地址） */
 void *sdsAllocPtr(sds s) {
-    return (void*) (s-sdsHdrSize(s[-1]));
+    return (void*) (s-sdsHdrSize(s[-1]));  // 字符串缓冲区的首地址减去header大小即可
 }
 
 /* Increment the sds length and decrements the left free space at the
@@ -363,22 +379,42 @@ void *sdsAllocPtr(sds s) {
  * ... check for nread <= 0 and handle it ...
  * sdsIncrLen(s, nread);
  */
+
+/* 取决于'incr'参数，此函数增加sds字符串的长度或减少剩余空闲空间的大小。
+ * 同时也将在新字符串的末尾设置终止符。
+ *
+ * 此函数用来修正调用sdsMakeRoomFor()函数之后字符串的长度，在当前字符串后追加数据
+ * 这些需要设置字符串新长度的操作之后。
+ *
+ * 注意：可以使用一个负的增量值来右对齐字符串。
+ *
+ * 用例:
+ *
+ * 使用sdsIncrLen()和sdsMakeRoomFor()函数可以用来满足如下模式，
+ * 从内核中直接复制一部分字节到一个sds字符串的末尾，且无须把数据先复制到一个中间缓冲区中：
+ *
+ * oldlen = sdslen(s);
+ * s = sdsMakeRoomFor(s, BUFFER_SIZE);
+ * nread = read(fd, s+oldlen, BUFFER_SIZE);
+ * ... check for nread <= 0 and handle it ...
+ * sdsIncrLen(s, nread);
+ */
 void sdsIncrLen(sds s, int incr) {
     unsigned char flags = s[-1];
     size_t len;
-    switch(flags&SDS_TYPE_MASK) {
+    switch(flags&SDS_TYPE_MASK) {  // 判断sds字符串类型
         case SDS_TYPE_5: {
-            unsigned char *fp = ((unsigned char*)s)-1;
-            unsigned char oldlen = SDS_TYPE_5_LEN(flags);
+            unsigned char *fp = ((unsigned char*)s)-1;  // flags指针
+            unsigned char oldlen = SDS_TYPE_5_LEN(flags); // 原始字符串大小
             assert((incr > 0 && oldlen+incr < 32) || (incr < 0 && oldlen >= (unsigned int)(-incr)));
-            *fp = SDS_TYPE_5 | ((oldlen+incr) << SDS_TYPE_BITS);
-            len = oldlen+incr;
+            *fp = SDS_TYPE_5 | ((oldlen+incr) << SDS_TYPE_BITS);  // 更新flags中字符串大小的比特位
+            len = oldlen+incr;  // 更新header的len
             break;
         }
         case SDS_TYPE_8: {
-            SDS_HDR_VAR(8,s);
+            SDS_HDR_VAR(8,s);  // 获取sds字符串的header指针
             assert((incr >= 0 && sh->alloc-sh->len >= incr) || (incr < 0 && sh->len >= (unsigned int)(-incr)));
-            len = (sh->len += incr);
+            len = (sh->len += incr);  // 更新header的len
             break;
         }
         case SDS_TYPE_16: {
@@ -401,7 +437,7 @@ void sdsIncrLen(sds s, int incr) {
         }
         default: len = 0; /* Just to avoid compilation warnings. */
     }
-    s[len] = '\0';
+    s[len] = '\0';  // 设置终止符
 }
 
 /* Grow the sds to have the specified length. Bytes that were not part of

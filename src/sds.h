@@ -147,7 +147,7 @@ static inline size_t sdsavail(const sds s) {
     return 0;
 }
 
-/* 设置sds的长度 */
+/* 设置sds的字符串长度 */
 static inline void sdssetlen(sds s, size_t newlen) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {  // 同上，获取sds类型

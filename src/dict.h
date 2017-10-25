@@ -33,6 +33,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* 哈希表实现 */
+
 #include <stdint.h>
 
 #ifndef __DICT_H
@@ -44,41 +46,49 @@
 /* Unused arguments generate annoying warnings... */
 #define DICT_NOTUSED(V) ((void) V)
 
+/* 保存key-value对的结构体 */
 typedef struct dictEntry {
-    void *key;
-    union {
-        void *val;
-        uint64_t u64;
-        int64_t s64;
-        double d;
+    void *key;  // 字典键
+    union {  // value是一个联合，只能存放下列类型值的其中一个
+        void *val;  // 空类型指针一枚
+        uint64_t u64;  // 无符号整型一枚
+        int64_t s64;  // 有符号整型一枚
+        double d;  // 双精度浮点数一枚
     } v;
-    struct dictEntry *next;
+    struct dictEntry *next;  // 指向下一个键值对节点的指针
 } dictEntry;
 
+/* 字典操作的方法 */
 typedef struct dictType {
-    unsigned int (*hashFunction)(const void *key);
-    void *(*keyDup)(void *privdata, const void *key);
-    void *(*valDup)(void *privdata, const void *obj);
-    int (*keyCompare)(void *privdata, const void *key1, const void *key2);
-    void (*keyDestructor)(void *privdata, void *key);
-    void (*valDestructor)(void *privdata, void *obj);
+    unsigned int (*hashFunction)(const void *key);  // 哈希函数指针，使用key来计算哈希值
+    void *(*keyDup)(void *privdata, const void *key);  // 复制key的函数指针
+    void *(*valDup)(void *privdata, const void *obj);  // 复制value的函数指针
+    int (*keyCompare)(void *privdata, const void *key1, const void *key2);  // 比较两个key的函数指针
+    void (*keyDestructor)(void *privdata, void *key);  // 销毁key的函数指针
+    void (*valDestructor)(void *privdata, void *obj);  // 销毁value的函数指针
 } dictType;
 
 /* This is our hash table structure. Every dictionary has two of this as we
  * implement incremental rehashing, for the old to the new table. */
+
+/* 这是我们的哈希表结构。每个字典都有两个这样的结构，因为
+ * 我们实现了从旧哈希表迁移数据到新哈希表的增量rehash。
+*/
+/* 哈希表结构 */
 typedef struct dictht {
-    dictEntry **table;
-    unsigned long size;
-    unsigned long sizemask;
-    unsigned long used;
+    dictEntry **table;  // 散列数组
+    unsigned long size;  // 散列数组长度
+    unsigned long sizemask;  // 散列数组长度掩码 = 散列数组长度-1
+    unsigned long used;  // 散列数组中已经被使用的节点数量
 } dictht;
 
+/* 字典结构 */
 typedef struct dict {
-    dictType *type;
-    void *privdata;
-    dictht ht[2];
-    long rehashidx; /* rehashing not in progress if rehashidx == -1 */
-    int iterators; /* number of iterators currently running */
+    dictType *type;  // 字典类型
+    void *privdata;  // 私有数据
+    dictht ht[2];  // 一个字典中有两个哈希表，原因如上述
+    long rehashidx; /* rehashing not in progress if rehashidx == -1 */  // 数据rehash的当前索引位置
+    int iterators; /* number of iterators currently running */  // 当前使用的迭代器数量
 } dict;
 
 /* If safe is set to 1 this is a safe iterator, that means, you can call

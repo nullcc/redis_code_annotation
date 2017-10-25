@@ -1002,11 +1002,23 @@ int sdscmp(const sds s1, const sds s2) {
  * requires length arguments. sdssplit() is just the
  * same function but for zero-terminated strings.
  */
-sds *sdssplitlen(const char *s, int len, const char *sep, int seplen, int *count) {
-    int elements = 0, slots = 5, start = 0, j;
-    sds *tokens;
 
-    if (seplen < 1 || len < 0) return NULL;
+/* 使用分割符'sep'分割sds字符串's'。返回一个sds字符串的数组。
+ * *count指向一个整型，表示分割成了多少个token。
+ *
+ * 内存不足、空字符串或空分隔符都将返回NULL。
+ *
+ * 注意'sep'分割符可以是多字符的。比如sdssplit("foo_-_bar","_-_");
+ * 将会返回"foo"和"bar"两个元素。
+ *
+ * 这个版本的函数是二进制安全的，但需要参数的长度。
+ * sdssplit()函数和它类似，但是是专门为以'\0'结束的字符串设计的。
+ */
+sds *sdssplitlen(const char *s, int len, const char *sep, int seplen, int *count) {
+    int elements = 0, slots = 5, start = 0, j;  // 预分配槽数为5
+    sds *tokens;  // 结果是一个sds数组
+
+    if (seplen < 1 || len < 0) return NULL;  // 空字符串或空分隔符都返回NULL
 
     tokens = s_malloc(sizeof(sds)*slots);
     if (tokens == NULL) return NULL;
@@ -1017,41 +1029,45 @@ sds *sdssplitlen(const char *s, int len, const char *sep, int seplen, int *count
     }
     for (j = 0; j < (len-(seplen-1)); j++) {
         /* make sure there is room for the next element and the final one */
+        /* 保证预留下一个和最后一个元素两个元素的空间 */
         if (slots < elements+2) {
             sds *newtokens;
 
-            slots *= 2;
-            newtokens = s_realloc(tokens,sizeof(sds)*slots);
-            if (newtokens == NULL) goto cleanup;
-            tokens = newtokens;
+            slots *= 2;  // 扩充槽数为原来的2倍
+            newtokens = s_realloc(tokens,sizeof(sds)*slots);  // 重新分配空间
+            if (newtokens == NULL) goto cleanup;  // 申请空间失败，做清除操作
+            tokens = newtokens;  // 更新tokens指针
         }
         /* search the separator */
-        if ((seplen == 1 && *(s+j) == sep[0]) || (memcmp(s+j,sep,seplen) == 0)) {
+        /* 查找分割符 */
+        if ((seplen == 1 && *(s+j) == sep[0]) || (memcmp(s+j,sep,seplen) == 0)) {  // sep为单字符和多字符的比较方式
             tokens[elements] = sdsnewlen(s+start,j-start);
             if (tokens[elements] == NULL) goto cleanup;
-            elements++;
-            start = j+seplen;
-            j = j+seplen-1; /* skip the separator */
+            elements++;  // 更新分割出来的元素个数
+            start = j+seplen;  // 更新下一次开始的位置
+            j = j+seplen-1; /* skip the separator */  // 跳过分割符
         }
     }
     /* Add the final element. We are sure there is room in the tokens array. */
+    /* 添加最后一个元素 */
     tokens[elements] = sdsnewlen(s+start,len-start);
     if (tokens[elements] == NULL) goto cleanup;
     elements++;
-    *count = elements;
+    *count = elements;  // 更新token个数指针，外部可以通过*count知道原字符串被分割成了多少个token
     return tokens;
 
 cleanup:
     {
         int i;
-        for (i = 0; i < elements; i++) sdsfree(tokens[i]);
+        for (i = 0; i < elements; i++) sdsfree(tokens[i]);  // 遍历tokens数组释放token
         s_free(tokens);
-        *count = 0;
+        *count = 0;  // 分割token个数设置为0
         return NULL;
     }
 }
 
-/* Free the result returned by sdssplitlen(), or do nothing if 'tokens' is NULL. */
+/* Free the result returned by sdssplitlen(), or do nothing if 'tokens' is NULL. *／
+/* 释放调用sdssplitlen()函数的返回值，如果tokens为NULL什么都不做。 */
 void sdsfreesplitres(sds *tokens, int count) {
     if (!tokens) return;
     while(count--)
@@ -1065,10 +1081,16 @@ void sdsfreesplitres(sds *tokens, int count) {
  *
  * After the call, the modified sds string is no longer valid and all the
  * references must be substituted with the new pointer returned by the call. */
+
+/* 向sds字符串's'末尾追加一个已转义的字符串，这个字符串中的所有不可打印字符（可以用isprint()测试）
+ * 都被转义成"\n\r\a...."或"\x<hex-number>"。
+ *
+ * 调用此函数后，原来作为参数传入的sds字符串的指针不再是有效的，
+ * 所有引用必须被替换为函数返回的新指针。 */
 sds sdscatrepr(sds s, const char *p, size_t len) {
-    s = sdscatlen(s,"\"",1);
+    s = sdscatlen(s,"\"",1);  // 在s末尾追加一个双引号
     while(len--) {
-        switch(*p) {
+        switch(*p) {  // 判断新字符串当前位置的值
         case '\\':
         case '"':
             s = sdscatprintf(s,"\\%c",*p);
@@ -1087,11 +1109,13 @@ sds sdscatrepr(sds s, const char *p, size_t len) {
         }
         p++;
     }
-    return sdscatlen(s,"\"",1);
+    return sdscatlen(s,"\"",1);  // 在末尾再追加一个双引号
 }
 
 /* Helper function for sdssplitargs() that returns non zero if 'c'
  * is a valid hex digit. */
+
+/* sdssplitargs()函数的帮助方法，该函数判断传入的字符'c'是否是一个合法的十六进制数。 */
 int is_hex_digit(char c) {
     return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
            (c >= 'A' && c <= 'F');
@@ -1099,6 +1123,8 @@ int is_hex_digit(char c) {
 
 /* Helper function for sdssplitargs() that converts a hex digit into an
  * integer from 0 to 15 */
+
+/* sdssplitargs()函数的帮助方法，将一个十六进制数转换成相对应的十进制数（0-15）。 */
 int hex_digit_to_int(char c) {
     switch(c) {
     case '0': return 0;
@@ -1139,6 +1165,21 @@ int hex_digit_to_int(char c) {
  * input string is empty, or NULL if the input contains unbalanced
  * quotes or closed quotes followed by non space characters
  * as in: "foo"bar or "foo'
+ */
+
+/* 将一行文本分割成多个参数，每个参数是类似交互式环境下命令的格式：
+ *
+ * foo bar "newline are supported\n" and "\xff\x00otherstuff"
+ *
+ * 参数的个数保存在*argc中，函数返回一个sds字符串的数组。
+ *
+ * 调用者应该调用sdsfreesplitres()函数来释放返回的结果数组。
+ *
+ * sdscatrepr()可以把一个被引号包含的字符串转换成一个个token，就像
+ * sdssplitargs()的逆操作。
+ *
+ * 此函数成功时返回一个token数组，即使入参字符串为空或NULL或者
+ * 包含未闭合的引号，比如："foo"bar 或 "foo'
  */
 sds *sdssplitargs(const char *line, int *argc) {
     const char *p = line;
@@ -1259,6 +1300,14 @@ err:
  *
  * The function returns the sds string pointer, that is always the same
  * as the input pointer since no resize is needed. */
+
+/* 在sds字符串中，用'to'字符串中的字符替换'from'字符串中的字符，
+ * 'to'字符串和'from'字符串的字符有位置对应关系。
+ *
+ * 比如: sdsmapchars(mystring, "ho", "01", 2)
+ * 将会把"hello"转换成"0ell1"。（注意替换字符和原字符的位置对应关系）
+ *
+ * 此函数返回sds字符串的指针，这和入参的sds字符串相同，因为不需要重新分配空间。 */
 sds sdsmapchars(sds s, const char *from, const char *to, size_t setlen) {
     size_t j, i, l = sdslen(s);
 
@@ -1275,18 +1324,23 @@ sds sdsmapchars(sds s, const char *from, const char *to, size_t setlen) {
 
 /* Join an array of C strings using the specified separator (also a C string).
  * Returns the result as an sds string. */
+
+/* 使用分隔符sep将字符数组argv拼接成一个字符串。
+ * 返回值是一个sds字符串。 */
 sds sdsjoin(char **argv, int argc, char *sep) {
-    sds join = sdsempty();
+    sds join = sdsempty();  // 初始化一个空的sds字符串
     int j;
 
     for (j = 0; j < argc; j++) {
-        join = sdscat(join, argv[j]);
-        if (j != argc-1) join = sdscat(join,sep);
+        join = sdscat(join, argv[j]);  // 把argv中的字符串连接到join中
+        if (j != argc-1) join = sdscat(join,sep);  // 最后一个字符串手动追加一个分割符sep
     }
     return join;
 }
 
 /* Like sdsjoin, but joins an array of SDS strings. */
+
+/* 和sdsjoin类似，但argv中的元素都是sds字符串 */
 sds sdsjoinsds(sds *argv, int argc, const char *sep, size_t seplen) {
     sds join = sdsempty();
     int j;
@@ -1303,10 +1357,15 @@ sds sdsjoinsds(sds *argv, int argc, const char *sep, size_t seplen) {
  * the overhead of function calls. Here we define these wrappers only for
  * the programs SDS is linked to, if they want to touch the SDS internals
  * even if they use a different allocator. */
+
+/* sds使用的内存分配包装函数。注意，实际上这些包装函数只是定义在sdsalloc.h的宏而已，
+ * 因为这么做可以避免额外的函数调用开销。下面定义的这些包装函数只是给那些想要接触
+ * sds内部的外部连接sds的程序用的。 */
 void *sds_malloc(size_t size) { return s_malloc(size); }
 void *sds_realloc(void *ptr, size_t size) { return s_realloc(ptr,size); }
 void sds_free(void *ptr) { s_free(ptr); }
 
+/* 以下是sds的测试用例 */
 #if defined(SDS_TEST_MAIN)
 #include <stdio.h>
 #include "testhelp.h"

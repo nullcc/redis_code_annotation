@@ -540,6 +540,11 @@ sds sdscpy(sds s, const char *t) {
  *
  * The function returns the length of the null-terminated string
  * representation stored at 's'. */
+
+/* sdscatlonglong()的帮助函数，负责将一个数字转换成一个字符串。
+ * 's'必须指向一个大小至少为SDS_LLSTR_SIZE字节的字符串。
+ *
+ * 此函数返回's'指向的以'\0'结束的字符串的长度。 */
 #define SDS_LLSTR_SIZE 21
 int sdsll2str(char *s, long long value) {
     char *p, aux;
@@ -548,19 +553,22 @@ int sdsll2str(char *s, long long value) {
 
     /* Generate the string representation, this method produces
      * an reversed string. */
-    v = (value < 0) ? -value : value;
+    /* 此方法生成一个字符串的逆序字符串。 */
+    v = (value < 0) ? -value : value;  // 使用传入数字的绝对值
     p = s;
-    do {
-        *p++ = '0'+(v%10);
-        v /= 10;
+    do {  // 循环取数字的个位数复制到s的相应位置
+        *p++ = '0'+(v%10);  
+        v /= 10;  // 
     } while(v);
-    if (value < 0) *p++ = '-';
+    if (value < 0) *p++ = '-';  // 负数则在在最后一个数字上加上-
 
     /* Compute length and add null term. */
+    /* 计算字符串长度并在结尾加上'\0' */
     l = p-s;
     *p = '\0';
 
     /* Reverse the string. */
+    /* 逆序排列字符串 */
     p--;
     while(s < p) {
         aux = *s;
@@ -573,6 +581,9 @@ int sdsll2str(char *s, long long value) {
 }
 
 /* Identical sdsll2str(), but for unsigned long long type. */
+
+/* 和sdsll2str()相同, 但是针对无符号的long long 类型。
+ * 代码中去掉了对负数情况的处理。 */
 int sdsull2str(char *s, unsigned long long v) {
     char *p, aux;
     size_t l;
@@ -605,21 +616,30 @@ int sdsull2str(char *s, unsigned long long v) {
  *
  * sdscatprintf(sdsempty(),"%lld\n", value);
  */
-sds sdsfromlonglong(long long value) {
-    char buf[SDS_LLSTR_SIZE];
-    int len = sdsll2str(buf,value);
 
-    return sdsnewlen(buf,len);
+/* 从一个long long类型的数字创建sds字符串，这个函数比如下调用要快：
+ *
+ * sdscatprintf(sdsempty(),"%lld\n", value);
+ */
+sds sdsfromlonglong(long long value) {
+    char buf[SDS_LLSTR_SIZE];  // 定义一个字符串数组
+    int len = sdsll2str(buf,value);  // 从数字创建字符串
+
+    return sdsnewlen(buf,len);  // 更新sds字符串header的len
 }
 
 /* Like sdscatprintf() but gets va_list instead of being variadic. */
+
+/* 和sdscatprintf()类似，但使用va_list而不是变长参数列表 */
 sds sdscatvprintf(sds s, const char *fmt, va_list ap) {
     va_list cpy;
     char staticbuf[1024], *buf = staticbuf, *t;
-    size_t buflen = strlen(fmt)*2;
+    size_t buflen = strlen(fmt)*2;  // buflen设置为格式化字符串长度的两倍
 
     /* We try to start using a static buffer for speed.
      * If not possible we revert to heap allocation. */
+    /* 若需要的缓冲区大小大于静态缓冲区大小（1024字节），则使用静态缓冲区高效处理，
+     * 如果行不通则转为在堆上申请内存。 */
     if (buflen > sizeof(staticbuf)) {
         buf = s_malloc(buflen);
         if (buf == NULL) return NULL;
@@ -629,10 +649,11 @@ sds sdscatvprintf(sds s, const char *fmt, va_list ap) {
 
     /* Try with buffers two times bigger every time we fail to
      * fit the string in the current buffer size. */
+    /* 当前缓冲区大小不足以容纳字符串时，尝试扩大缓冲区大小为原来的2倍。 */
     while(1) {
         buf[buflen-2] = '\0';
-        va_copy(cpy,ap);
-        vsnprintf(buf, buflen, fmt, cpy);
+        va_copy(cpy,ap);  // 指向可变参数的指针
+        vsnprintf(buf, buflen, fmt, cpy);  // 把生成的格式化字符串放到buf中
         va_end(cpy);
         if (buf[buflen-2] != '\0') {
             if (buf != staticbuf) s_free(buf);
@@ -645,6 +666,7 @@ sds sdscatvprintf(sds s, const char *fmt, va_list ap) {
     }
 
     /* Finally concat the obtained string to the SDS string and return it. */
+    /* 最后把获得的字符串连接到sds字符串末尾并返回。 */
     t = sdscat(s, buf);
     if (buf != staticbuf) s_free(buf);
     return t;
@@ -663,6 +685,22 @@ sds sdscatvprintf(sds s, const char *fmt, va_list ap) {
  *
  * Often you need to create a string from scratch with the printf-alike
  * format. When this is the need, just use sdsempty() as the target string:
+ *
+ * s = sdscatprintf(sdsempty(), "... your format ...", args);
+ */
+
+/* 将一个由类似printf函数生成的格式化字符串追加到sds字符串's'末尾。
+ *
+ * 调用此函数后，原来作为参数传入的sds字符串的指针不再是有效的，
+ * 所有引用必须被替换为函数返回的新指针。
+ *
+ * 例子：
+ *
+ * s = sdsnew("Sum is: ");
+ * s = sdscatprintf(s,"%d+%d = %d",a,b,a+b).
+ *
+ * 你经常需要从一个类似printf函数生成的格式化字符串中创建字符串。
+ * 当你需要这么做时，址要使用sdsempty()的结果作为目标字符串即可：
  *
  * s = sdscatprintf(sdsempty(), "... your format ...", args);
  */
@@ -690,6 +728,20 @@ sds sdscatprintf(sds s, const char *fmt, ...) {
  * %u - unsigned int
  * %U - 64 bit unsigned integer (unsigned long long, uint64_t)
  * %% - Verbatim "%" character.
+ */
+
+/* 该函数和sdscatprintf类似，但比它更快，因为它不依赖于由libc实现的sprintf()族的函数，
+ * 这些函数经常很慢。此外直接将sds字符串作为新数据进行连接的的性能更好。
+ *
+ * 然而这个函数只能处理类printf函数的格式化说明符的子集：
+ *
+ * %s - C字符串
+ * %S - sds字符串
+ * %i - 有符号整型
+ * %I - 64位有符号整型(long long, int64_t)
+ * %u - 无符号整型
+ * %U - 64位无符号整型(unsigned long long, uint64_t)
+ * %% - 逐个处理%字符
  */
 sds sdscatfmt(sds s, char const *fmt, ...) {
     size_t initlen = sdslen(s);
@@ -795,18 +847,33 @@ sds sdscatfmt(sds s, char const *fmt, ...) {
  *
  * Output will be just "Hello World".
  */
+
+/* 移除字符串从左到右或从右到左出现的、连续的组合字符串，
+ * 字符串中的字符都是出现在'cset'中的字符。
+ *
+ * 调用此函数后，原来作为参数传入的sds字符串的指针不再是有效的，
+ * 所有引用必须被替换为函数返回的新指针。
+ *
+ * 例子：
+ *
+ * s = sdsnew("AA...AA.a.aa.aHelloWorld     :::");
+ * s = sdstrim(s,"Aa. :");
+ * printf("%s\n", s);
+ *
+ * 输出为 "Hello World".
+ */
 sds sdstrim(sds s, const char *cset) {
     char *start, *end, *sp, *ep;
     size_t len;
 
-    sp = start = s;
-    ep = end = s+sdslen(s)-1;
-    while(sp <= end && strchr(cset, *sp)) sp++;
-    while(ep > sp && strchr(cset, *ep)) ep--;
-    len = (sp > ep) ? 0 : ((ep-sp)+1);
-    if (s != sp) memmove(s, sp, len);
+    sp = start = s;  // 字符串首地址指针
+    ep = end = s+sdslen(s)-1;  // 字符串尾地址指针
+    while(sp <= end && strchr(cset, *sp)) sp++;  // sp最终会停留在字符串左侧第一个不在cset中的字符地址上
+    while(ep > sp && strchr(cset, *ep)) ep--;  // ep最终会停留在字符串右侧第一个不在cset中的字符地址上
+    len = (sp > ep) ? 0 : ((ep-sp)+1);  // 过滤后的字符串长度
+    if (s != sp) memmove(s, sp, len);  // 更新字符串内容
     s[len] = '\0';
-    sdssetlen(s,len);
+    sdssetlen(s,len);  // 更新len
     return s;
 }
 
@@ -822,6 +889,20 @@ sds sdstrim(sds s, const char *cset) {
  * The string is modified in-place.
  *
  * Example:
+ *
+ * s = sdsnew("Hello World");
+ * sdsrange(s,1,-1); => "ello World"
+ */
+
+/* 将字符串截取为由'start'和'end'标示的索引区域的子串。 
+ * 
+ * start和end参数可以是负数，-1表示字符串的最后一个字符，-2是倒数第二个字符，以此类推。
+ *
+ * 最终结果会包含start和end位置的字符（闭区间）。
+ *
+ * 字符串会被就地修改，不会返回一个新的字符串。
+ *
+ * 例子：
  *
  * s = sdsnew("Hello World");
  * sdsrange(s,1,-1); => "ello World"
@@ -849,12 +930,14 @@ void sdsrange(sds s, int start, int end) {
     } else {
         start = 0;
     }
-    if (start && newlen) memmove(s, s+start, newlen);
+    if (start && newlen) memmove(s, s+start, newlen);  // 将截取的字符串覆盖原字符串
     s[newlen] = 0;
-    sdssetlen(s,newlen);
+    sdssetlen(s,newlen);  // 更新len
 }
 
 /* Apply tolower() to every character of the sds string 's'. */
+
+/* 将sds字符串's'的所有字符转换为小写。 */
 void sdstolower(sds s) {
     int len = sdslen(s), j;
 
@@ -862,6 +945,8 @@ void sdstolower(sds s) {
 }
 
 /* Apply toupper() to every character of the sds string 's'. */
+
+/* 将sds字符串's'的所有字符转换为大写。 */
 void sdstoupper(sds s) {
     int len = sdslen(s), j;
 
@@ -879,13 +964,23 @@ void sdstoupper(sds s) {
  * If two strings share exactly the same prefix, but one of the two has
  * additional characters, the longer string is considered to be greater than
  * the smaller one. */
+
+/* 使用memcmp()比较两个sds字符串s1和s2。
+ *
+ * 返回值含义：
+ *
+ *     s1 > s2时返回正数。
+ *     s1 < s2时返回负数。
+ *     当s1和s2的二进制串完全相等时返回0。
+ *
+ * 如果两个字符串有相同的前缀，但其中一个有额外的字符，长度更长的字符串会被认为更大。 */
 int sdscmp(const sds s1, const sds s2) {
     size_t l1, l2, minlen;
     int cmp;
 
     l1 = sdslen(s1);
     l2 = sdslen(s2);
-    minlen = (l1 < l2) ? l1 : l2;
+    minlen = (l1 < l2) ? l1 : l2;  // 两个字符串的最小长度
     cmp = memcmp(s1,s2,minlen);
     if (cmp == 0) return l1-l2;
     return cmp;

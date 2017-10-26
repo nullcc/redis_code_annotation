@@ -33,6 +33,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* 哈希表实现 */
+
 #include "fmacros.h"
 
 #include <stdio.h>
@@ -55,19 +57,28 @@
  * Note that even when dict_can_resize is set to 0, not all resizes are
  * prevented: a hash table is still allowed to grow if the ratio between
  * the number of elements and the buckets > dict_force_resize_ratio. */
-static int dict_can_resize = 1;
-static unsigned int dict_force_resize_ratio = 5;
+
+/* dictEnableResize()和dictDisableResize()函数允许我们在需要时启用/禁用哈希表的重新规划空间的
+ * 功能。这对Redis来说非常重要，因为我们使用写时复制且不希望在有子进程进行保存操作时移动太多内存
+ * 中的数据。
+ * 
+ * 需要注意的是即使dict_can_resize被设置为0，在某些情况下也会触发字典重新规划空间的操作：
+ * 当一个哈希表中的元素个数和散列数组（桶）的比例大于dict_force_resize_ratio时，
+ * 触发字典重新规划空间的操作。 */
+static int dict_can_resize = 1;  // 字典重新规划空间开关
+static unsigned int dict_force_resize_ratio = 5;  // 字典被强制进行重新规划空间时的（元素个数/桶大小）比例
 
 /* -------------------------- private prototypes ---------------------------- */
 
-static int _dictExpandIfNeeded(dict *ht);
-static unsigned long _dictNextPower(unsigned long size);
-static int _dictKeyIndex(dict *ht, const void *key);
-static int _dictInit(dict *ht, dictType *type, void *privDataPtr);
+static int _dictExpandIfNeeded(dict *ht);  // 判断字典是否需要扩容
+static unsigned long _dictNextPower(unsigned long size);  // 字典扩容的大小（字典的容量都是2的整数次方大小），该函数返回大于或等于size的2的整数次方的数字最小的那个
+static int _dictKeyIndex(dict *ht, const void *key);  // 返回指定key在散列数组中的索引值
+static int _dictInit(dict *ht, dictType *type, void *privDataPtr);  // 初始化一个字典
 
 /* -------------------------- hash functions -------------------------------- */
 
 /* Thomas Wang's 32 bit Mix Function */
+/* Thomas Wang's 32 bit Mix哈希算法，对一个无符号整型数进行一系列的移位运算，效率较高 */
 unsigned int dictIntHashFunction(unsigned int key)
 {
     key += ~(key << 15);
@@ -79,12 +90,14 @@ unsigned int dictIntHashFunction(unsigned int key)
     return key;
 }
 
-static uint32_t dict_hash_function_seed = 5381;
+static uint32_t dict_hash_function_seed = 5381;  // 哈希种子一枚
 
+/* 设置新的哈希种子 */
 void dictSetHashFunctionSeed(uint32_t seed) {
     dict_hash_function_seed = seed;
 }
 
+/* 获取当前哈希种子 */
 uint32_t dictGetHashFunctionSeed(void) {
     return dict_hash_function_seed;
 }
@@ -99,6 +112,17 @@ uint32_t dictGetHashFunctionSeed(void) {
  * 1. It will not work incrementally.
  * 2. It will not produce the same results on little-endian and big-endian
  *    machines.
+ */
+
+/* Austin Appleby的MurmurHash2算法
+ * 注意：这段代码对你的机器的行为做了一些假设：
+ * 1. 可以从任何内存地址读取一个4字节的数据而不会崩溃
+ * 2. sizeof(int) == 4
+ *
+ * 还有一些限制：
+ *
+ * 1. 它无法增量地工作。
+ * 2. 它在小端和大端机器上的结果不同。
  */
 unsigned int dictGenHashFunction(const void *key, int len) {
     /* 'm' and 'r' are mixing constants generated offline.
@@ -144,6 +168,8 @@ unsigned int dictGenHashFunction(const void *key, int len) {
 }
 
 /* And a case insensitive hash function (based on djb hash) */
+
+/* 一个对大小写不敏感的哈希函数（基于djb哈希算法） */
 unsigned int dictGenCaseHashFunction(const unsigned char *buf, int len) {
     unsigned int hash = (unsigned int)dict_hash_function_seed;
 

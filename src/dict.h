@@ -107,7 +107,7 @@ typedef struct dictIterator {
     int table, safe;  // 安全标志
     dictEntry *entry, *nextEntry;  // 当前键值对结构体指针，下一个键值对结构体指针
     /* unsafe iterator fingerprint for misuse detection. */
-    long long fingerprint;
+    long long fingerprint;  // 字典的指纹
 } dictIterator;
 
 /* 字典扫描函数指针 */

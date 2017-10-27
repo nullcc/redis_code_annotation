@@ -104,7 +104,7 @@ typedef struct dict {
 typedef struct dictIterator {
     dict *d;  // 字典指针
     long index;  // 散列数组的当前索引值
-    int table, safe;  // 安全标志
+    int table, safe;  // 哈希表编号（0／1）和安全标志
     dictEntry *entry, *nextEntry;  // 当前键值对结构体指针，下一个键值对结构体指针
     /* unsafe iterator fingerprint for misuse detection. */
     long long fingerprint;  // 字典的指纹

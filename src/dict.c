@@ -1077,20 +1077,28 @@ unsigned long dictScan(dict *d,
 }
 
 /* ------------------------- private functions ------------------------------ */
+/* ------------------------- 私有函数 ------------------------------ */
 
 /* Expand the hash table if needed */
+
+/* 判断字典是否需要扩容，如果需要则扩容，否则什么也不做 */
 static int _dictExpandIfNeeded(dict *d)
 {
     /* Incremental rehashing already in progress. Return. */
+    /* 正在进行增量式rehash，直接返回 */
     if (dictIsRehashing(d)) return DICT_OK;
 
     /* If the hash table is empty expand it to the initial size. */
+    /* 如果哈希表为空（散列数组大小为0），把它的大小扩容到初始状态（散列数组的初始大小） */
     if (d->ht[0].size == 0) return dictExpand(d, DICT_HT_INITIAL_SIZE);
 
     /* If we reached the 1:1 ratio, and we are allowed to resize the hash
      * table (global setting) or we should avoid it but the ratio between
      * elements/buckets is over the "safe" threshold, we resize doubling
      * the number of buckets. */
+    /* 如果元素数量和散列数组的比值达到或超过1:1，且我们允许调整哈希表的大小（全局变量dict_can_resize为1）
+     * 或者虽然我们不允许调整哈希表大小（全局变量dict_can_resize为0），但是元素数量/散列数组的值
+     * 已经超过安全阈值（全局变量dict_force_resize_ratio），我们把哈希表大小调整为当前已使用桶数量的两倍。 */
     if (d->ht[0].used >= d->ht[0].size &&
         (dict_can_resize ||
          d->ht[0].used/d->ht[0].size > dict_force_resize_ratio))
@@ -1101,11 +1109,13 @@ static int _dictExpandIfNeeded(dict *d)
 }
 
 /* Our hash table capability is a power of two */
+
+/* 哈希表的大小一定是2的正整数次方，此函数返回大于且最接近size的2的正整数次方的数字 */
 static unsigned long _dictNextPower(unsigned long size)
 {
     unsigned long i = DICT_HT_INITIAL_SIZE;
 
-    if (size >= LONG_MAX) return LONG_MAX;
+    if (size >= LONG_MAX) return LONG_MAX;   // 防止size溢出
     while(1) {
         if (i >= size)
             return i;
@@ -1119,48 +1129,61 @@ static unsigned long _dictNextPower(unsigned long size)
  *
  * Note that if we are in the process of rehashing the hash table, the
  * index is always returned in the context of the second (new) hash table. */
+
+/* 计算一个给定key在字典中的索引值。
+ * 如果key已经存在，返回-1。
+ *
+ * 需要注意的是如果哈希表正在进行rehash，返回的总是1号哈希表（新哈希表）的索引值。 */
 static int _dictKeyIndex(dict *d, const void *key)
 {
     unsigned int h, idx, table;
     dictEntry *he;
 
     /* Expand the hash table if needed */
+    /* 如果需要，扩容字典 */
     if (_dictExpandIfNeeded(d) == DICT_ERR)
         return -1;
     /* Compute the key hash value */
+    /* 计算key的哈希值*/
     h = dictHashKey(d, key);
     for (table = 0; table <= 1; table++) {
-        idx = h & d->ht[table].sizemask;
+        idx = h & d->ht[table].sizemask;  // 计算key的索引值
         /* Search if this slot does not already contain the given key */
-        he = d->ht[table].table[idx];
+        /* 遍历当前桶的entry链表查找指定的key是否已经存在 */
+        he = d->ht[table].table[idx];  // 桶中第一个元素
         while(he) {
-            if (key==he->key || dictCompareKeys(d, key, he->key))
+            if (key==he->key || dictCompareKeys(d, key, he->key))  // 找到此key说明已存在，返回-1
                 return -1;
-            he = he->next;
+            he = he->next;  // 下一个元素
         }
-        if (!dictIsRehashing(d)) break;
+        if (!dictIsRehashing(d)) break;  // 字典不在rehash，只查看0号哈希表即可，跳过1号哈希表
     }
     return idx;
 }
 
+/* 清空字典数据并调用回调函数 */
 void dictEmpty(dict *d, void(callback)(void*)) {
-    _dictClear(d,&d->ht[0],callback);
-    _dictClear(d,&d->ht[1],callback);
-    d->rehashidx = -1;
-    d->iterators = 0;
+    _dictClear(d,&d->ht[0],callback);  // 清空0号哈希表，并调用回调函数
+    _dictClear(d,&d->ht[1],callback);  // 清空1号哈希表，并调用回调函数
+    d->rehashidx = -1;  // 设置不在rehash过程中
+    d->iterators = 0;  // 设置当前迭代器数量为0
 }
 
+/* 允许调整字典大小 */
 void dictEnableResize(void) {
     dict_can_resize = 1;
 }
 
+/* 禁止调整字典大小 */
 void dictDisableResize(void) {
     dict_can_resize = 0;
 }
 
 /* ------------------------------- Debugging ---------------------------------*/
+/* ------------------------------- 调试用 ---------------------------------*/
 
 #define DICT_STATS_VECTLEN 50
+/* 获取字典哈希表状态 */
 size_t _dictGetStatsHt(char *buf, size_t bufsize, dictht *ht, int tableid) {
     unsigned long i, slots = 0, chainlen, maxchainlen = 0;
     unsigned long totchainlen = 0;
@@ -1222,6 +1245,7 @@ size_t _dictGetStatsHt(char *buf, size_t bufsize, dictht *ht, int tableid) {
     return strlen(buf);
 }
 
+/* 获取字典状态 */ 
 void dictGetStats(char *buf, size_t bufsize, dict *d) {
     size_t l;
     char *orig_buf = buf;

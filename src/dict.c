@@ -1186,38 +1186,43 @@ void dictDisableResize(void) {
 /* 获取字典哈希表状态 */
 size_t _dictGetStatsHt(char *buf, size_t bufsize, dictht *ht, int tableid) {
     unsigned long i, slots = 0, chainlen, maxchainlen = 0;
-    unsigned long totchainlen = 0;
+    unsigned long totchainlen = 0;  // entry链表总长度
     unsigned long clvector[DICT_STATS_VECTLEN];
     size_t l = 0;
 
-    if (ht->used == 0) {
+    if (ht->used == 0) {  // 空字典不需要获取它的状态
         return snprintf(buf,bufsize,
             "No stats available for empty dictionaries\n");
     }
 
     /* Compute stats. */
     for (i = 0; i < DICT_STATS_VECTLEN; i++) clvector[i] = 0;
-    for (i = 0; i < ht->size; i++) {
-        dictEntry *he;
+    for (i = 0; i < ht->size; i++) {  // 遍历整个哈希表的散列数组
+        dictEntry *he;  // entry指针
 
-        if (ht->table[i] == NULL) {
+        if (ht->table[i] == NULL) {  // 空桶直接跳过
             clvector[0]++;
             continue;
         }
-        slots++;
+        slots++;  // 非空桶数量+1
         /* For each hash entry on this slot... */
-        chainlen = 0;
+        /* 遍历该桶上的entry链表 */
+        chainlen = 0;  // entry链表长度
         he = ht->table[i];
-        while(he) {
+        while(he) {  // 计算该桶上的entry链表长度
             chainlen++;
             he = he->next;
         }
+        /* 如果当前桶的entry链表长度小于DICT_STATS_VECTLEN，以该长度作为索引，
+         * 自增clvector该索引下的值，否则自增clvector最后一个索引的值，clvector
+         * 会作为之后计算哈希表entry链表长度比例分布的数据源。 */
         clvector[(chainlen < DICT_STATS_VECTLEN) ? chainlen : (DICT_STATS_VECTLEN-1)]++;
-        if (chainlen > maxchainlen) maxchainlen = chainlen;
-        totchainlen += chainlen;
+        if (chainlen > maxchainlen) maxchainlen = chainlen;  // 更新最大entry链表长度
+        totchainlen += chainlen;  // 更新entry链表总长度
     }
 
     /* Generate human readable stats. */
+    /* 生成可读性好的状态信息 */
     l += snprintf(buf+l,bufsize-l,
         "Hash table %d stats (%s):\n"
         " table size: %ld\n"
@@ -1232,12 +1237,12 @@ size_t _dictGetStatsHt(char *buf, size_t bufsize, dictht *ht, int tableid) {
         (float)totchainlen/slots, (float)ht->used/slots);
 
     for (i = 0; i < DICT_STATS_VECTLEN-1; i++) {
-        if (clvector[i] == 0) continue;
+        if (clvector[i] == 0) continue;  // 跳过entry链表长度等于0的桶
         if (l >= bufsize) break;
         l += snprintf(buf+l,bufsize-l,
             "   %s%ld: %ld (%.02f%%)\n",
             (i == DICT_STATS_VECTLEN-1)?">= ":"",
-            i, clvector[i], ((float)clvector[i]/ht->size)*100);
+            i, clvector[i], ((float)clvector[i]/ht->size)*100);  // 计算entry链表长度比例分布
     }
 
     /* Unlike snprintf(), teturn the number of characters actually written. */
@@ -1251,11 +1256,11 @@ void dictGetStats(char *buf, size_t bufsize, dict *d) {
     char *orig_buf = buf;
     size_t orig_bufsize = bufsize;
 
-    l = _dictGetStatsHt(buf,bufsize,&d->ht[0],0);
+    l = _dictGetStatsHt(buf,bufsize,&d->ht[0],0);  // 默认获取0号哈希表的状态
     buf += l;
     bufsize -= l;
     if (dictIsRehashing(d) && bufsize > 0) {
-        _dictGetStatsHt(buf,bufsize,&d->ht[1],1);
+        _dictGetStatsHt(buf,bufsize,&d->ht[1],1);  // 如果字典正在rehash，获取1号哈希表的状态
     }
     /* Make sure there is a NULL term at the end. */
     if (orig_bufsize) orig_buf[orig_bufsize-1] = '\0';

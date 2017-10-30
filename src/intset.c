@@ -28,6 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* 整数集合 */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,11 +39,16 @@
 
 /* Note that these encodings are ordered, so:
  * INTSET_ENC_INT16 < INTSET_ENC_INT32 < INTSET_ENC_INT64. */
+
+/* 注意下面这些编码是有顺序的，关系如下：
+ * INTSET_ENC_INT16 < INTSET_ENC_INT32 < INTSET_ENC_INT64. */
 #define INTSET_ENC_INT16 (sizeof(int16_t))
 #define INTSET_ENC_INT32 (sizeof(int32_t))
 #define INTSET_ENC_INT64 (sizeof(int64_t))
 
 /* Return the required encoding for the provided value. */
+
+/* 返回给定数字需要的编码方式 */
 static uint8_t _intsetValueEncoding(int64_t v) {
     if (v < INT32_MIN || v > INT32_MAX)
         return INTSET_ENC_INT64;
@@ -52,6 +59,8 @@ static uint8_t _intsetValueEncoding(int64_t v) {
 }
 
 /* Return the value at pos, given an encoding. */
+
+/* 根据给定的索引值和编码获取整数集合中的元素 */
 static int64_t _intsetGetEncoded(intset *is, int pos, uint8_t enc) {
     int64_t v64;
     int32_t v32;
@@ -73,11 +82,15 @@ static int64_t _intsetGetEncoded(intset *is, int pos, uint8_t enc) {
 }
 
 /* Return the value at pos, using the configured encoding. */
+
+/* 根据给定的索引值获取整数集合中的元素，编码使用整数集合的encoding。 */
 static int64_t _intsetGet(intset *is, int pos) {
     return _intsetGetEncoded(is,pos,intrev32ifbe(is->encoding));
 }
 
 /* Set the value at pos, using the configured encoding. */
+
+/* 设置整数集合指定索引值上的元素值，编码使用整数集合的encoding。 */
 static void _intsetSet(intset *is, int pos, int64_t value) {
     uint32_t encoding = intrev32ifbe(is->encoding);
 
@@ -94,17 +107,21 @@ static void _intsetSet(intset *is, int pos, int64_t value) {
 }
 
 /* Create an empty intset. */
+
+/* 创建一个空的整数集合。 */
 intset *intsetNew(void) {
     intset *is = zmalloc(sizeof(intset));
-    is->encoding = intrev32ifbe(INTSET_ENC_INT16);
-    is->length = 0;
+    is->encoding = intrev32ifbe(INTSET_ENC_INT16);  // 默认编码是INTSET_ENC_INT16
+    is->length = 0;  // 集合长度初始化为0
     return is;
 }
 
 /* Resize the intset */
+
+/* 调整整数集合大小 */
 static intset *intsetResize(intset *is, uint32_t len) {
-    uint32_t size = len*intrev32ifbe(is->encoding);
-    is = zrealloc(is,sizeof(intset)+size);
+    uint32_t size = len*intrev32ifbe(is->encoding);  // 计算新的集合空间大小
+    is = zrealloc(is,sizeof(intset)+size);  // realloc新的空间，size是集合数组contents的大小，所以还要加上整数集合结构的其他成员空间大小
     return is;
 }
 

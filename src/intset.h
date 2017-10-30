@@ -28,24 +28,27 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* 整数集合 */
+
 #ifndef __INTSET_H
 #define __INTSET_H
 #include <stdint.h>
 
+/* 整数集合结构 */
 typedef struct intset {
-    uint32_t encoding;
-    uint32_t length;
-    int8_t contents[];
+    uint32_t encoding;  // 编码方式
+    uint32_t length;    // 集合大小
+    int8_t contents[];  // 集合数组
 } intset;
 
-intset *intsetNew(void);
-intset *intsetAdd(intset *is, int64_t value, uint8_t *success);
-intset *intsetRemove(intset *is, int64_t value, int *success);
-uint8_t intsetFind(intset *is, int64_t value);
-int64_t intsetRandom(intset *is);
-uint8_t intsetGet(intset *is, uint32_t pos, int64_t *value);
-uint32_t intsetLen(intset *is);
-size_t intsetBlobLen(intset *is);
+intset *intsetNew(void);  // 创建一个新整数集合
+intset *intsetAdd(intset *is, int64_t value, uint8_t *success);  // 向一个整数集合中加入元素
+intset *intsetRemove(intset *is, int64_t value, int *success);  // 从一个整数集合中移除元素
+uint8_t intsetFind(intset *is, int64_t value);  // 在一个整数集合中查找元素
+int64_t intsetRandom(intset *is);  // 从一个整数集合中随机返回一个元素
+uint8_t intsetGet(intset *is, uint32_t pos, int64_t *value);  // 获取整数集合中指定位置上的元素
+uint32_t intsetLen(intset *is);  // 获取整数集合的长度
+size_t intsetBlobLen(intset *is);  // 获取整数集合以字节为单位的大小
 
 #ifdef REDIS_TEST
 int intsetTest(int argc, char *argv[]);

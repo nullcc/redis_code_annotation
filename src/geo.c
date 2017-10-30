@@ -28,12 +28,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* 地理位置 */
+
 #include "geo.h"
 #include "geohash_helper.h"
 #include "debugmacro.h"
 
 /* Things exported from t_zset.c only for geo.c, since it is the only other
  * part of Redis that requires close zset introspection. */
+/* 这两个函数是从t_zset.c中导出专用于geo.c的， */
 unsigned char *zzlFirstInRange(unsigned char *zl, zrangespec *range);
 int zslValueLteMax(double value, zrangespec *spec);
 
@@ -45,14 +48,29 @@ int zslValueLteMax(double value, zrangespec *spec);
  *   - georadiusbymember - search radius based on geoset member position
  * ==================================================================== */
 
+ /* ====================================================================
+ * 这个文件实现了下列命令：
+ *
+ *   - geoadd - 对地理位置集合添加地理位置
+ *   - georadius - 在地理位置集合中查找搜索半径内的地理位置
+ *   - georadiusbymember - 根据给定的地理位置查找一定范围内的地理位置集合
+ * ==================================================================== */
+
 /* ====================================================================
  * geoArray implementation
  * ==================================================================== */
 
+/* ====================================================================
+ * geoArray 实现
+ * ==================================================================== */
+
 /* Create a new array of geoPoints. */
+
+/* 创建一个地理位置（geoPoints）数组 */
 geoArray *geoArrayCreate(void) {
-    geoArray *ga = zmalloc(sizeof(*ga));
+    geoArray *ga = zmalloc(sizeof(*ga));  // 分配内存空间
     /* It gets allocated on first geoArrayAppend() call. */
+    /* ga->array将在第一次调用geoArrayAppend()函数时分配数组的空间 */
     ga->array = NULL;
     ga->buckets = 0;
     ga->used = 0;
@@ -61,27 +79,37 @@ geoArray *geoArrayCreate(void) {
 
 /* Add a new entry and return its pointer so that the caller can populate
  * it with data. */
+
+/* 向给定的地理位置数组中添加地理位置，并返回新元素的指针，这样调用者就可以用数据填充它。 */
 geoPoint *geoArrayAppend(geoArray *ga) {
-    if (ga->used == ga->buckets) {
-        ga->buckets = (ga->buckets == 0) ? 8 : ga->buckets*2;
-        ga->array = zrealloc(ga->array,sizeof(geoPoint)*ga->buckets);
+    if (ga->used == ga->buckets) {  // 数组已满
+        ga->buckets = (ga->buckets == 0) ? 8 : ga->buckets*2;  // 增加当前数组的大小
+        ga->array = zrealloc(ga->array,sizeof(geoPoint)*ga->buckets);  // 为扩容的数组realloc空间
     }
-    geoPoint *gp = ga->array+ga->used;
-    ga->used++;
-    return gp;
+    geoPoint *gp = ga->array+ga->used;  // 新地理位置结构追加到数组末尾
+    ga->used++;  // 更新数组中元素数量
+    return gp;  // 返回新地理位置结构的地址供填充用
 }
 
 /* Destroy a geoArray created with geoArrayCreate(). */
+
+/* 销毁由geoArrayCreate()函数创建的地理位置数组。 */
 void geoArrayFree(geoArray *ga) {
     size_t i;
-    for (i = 0; i < ga->used; i++) sdsfree(ga->array[i].member);
-    zfree(ga->array);
-    zfree(ga);
+    for (i = 0; i < ga->used; i++) sdsfree(ga->array[i].member);  // 遍历数组，释放每个元素的member成员（这是个char *）
+    zfree(ga->array);  // 释放数组
+    zfree(ga);  // 释放geoArray结构
 }
 
 /* ====================================================================
  * Helpers
  * ==================================================================== */
+
+/* ====================================================================
+ * 帮助函数
+ * ==================================================================== */
+
+/*  */
 int decodeGeohash(double bits, double *xy) {
     GeoHashBits hash = { .bits = (uint64_t)bits, .step = GEO_STEP_MAX };
     return geohashDecodeToLongLatWGS84(hash, xy);

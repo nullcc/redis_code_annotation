@@ -29,6 +29,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+
+/* hyperloglog.c - Redis HyperLogLog 基数估计算法 */
+
 #include "server.h"
 
 #include <stdint.h>

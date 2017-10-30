@@ -37,7 +37,7 @@
 /* 整数集合结构 */
 typedef struct intset {
     uint32_t encoding;  // 编码方式
-    uint32_t length;    // 集合大小
+    uint32_t length;    // 集合数组中元素个数
     int8_t contents[];  // 集合数组
 } intset;
 

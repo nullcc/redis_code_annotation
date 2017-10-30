@@ -129,26 +129,35 @@ static intset *intsetResize(intset *is, uint32_t len) {
  * sets "pos" to the position of the value within the intset. Return 0 when
  * the value is not present in the intset and sets "pos" to the position
  * where "value" can be inserted. */
+
+/* 查找"value"的位置。当找到这个值时返回1且将"pos"指向的值设置为这个位置。
+ * 当没有找到这个值时返回0且将"pos"指向的值设置为插入"value"到这个整数集合时
+ * 所在的位置。 */
 static uint8_t intsetSearch(intset *is, int64_t value, uint32_t *pos) {
     int min = 0, max = intrev32ifbe(is->length)-1, mid = -1;
     int64_t cur = -1;
 
     /* The value can never be found when the set is empty */
+    /* 整数集合为空时，不可能找到该值的位置 */
     if (intrev32ifbe(is->length) == 0) {
-        if (pos) *pos = 0;
+        if (pos) *pos = 0;  // 向一个空的整数集合加入元素时当然是放在索引为0的位置了
         return 0;
     } else {
         /* Check for the case where we know we cannot find the value,
          * but do know the insert position. */
+        /* 当在集合中找不到该值时，我们会知道它的插入位置。 */
         if (value > _intsetGet(is,intrev32ifbe(is->length)-1)) {
+            // 整数集合中数组的最后一个值最大，如果value大于这个最大值，插入索引就是当前数组长度
             if (pos) *pos = intrev32ifbe(is->length);
             return 0;
         } else if (value < _intsetGet(is,0)) {
+            // 整数集合中数组的第一个值最小，如果value小于这个最小值，插入索引就是0
             if (pos) *pos = 0;
             return 0;
         }
     }
 
+    /* 插入索引在中间的情况，使用二分查找法找到插入位置 */
     while(max >= min) {
         mid = ((unsigned int)min + (unsigned int)max) >> 1;
         cur = _intsetGet(is,mid);
@@ -161,10 +170,10 @@ static uint8_t intsetSearch(intset *is, int64_t value, uint32_t *pos) {
         }
     }
 
-    if (value == cur) {
+    if (value == cur) {  // 在整数集合中找到了value，将pos指向的值设为value在数组中的索引
         if (pos) *pos = mid;
         return 1;
-    } else {
+    } else {  // 在整数集合中没有找到value，获得它的插入位置，复制给pos指向的值
         if (pos) *pos = min;
         return 0;
     }

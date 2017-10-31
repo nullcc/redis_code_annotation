@@ -28,25 +28,54 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* 压缩链表 */
+
 #ifndef _ZIPLIST_H
 #define _ZIPLIST_H
 
-#define ZIPLIST_HEAD 0
-#define ZIPLIST_TAIL 1
+#define ZIPLIST_HEAD 0  // 压缩链表头
+#define ZIPLIST_TAIL 1  // 压缩链表尾
 
-unsigned char *ziplistNew(void);
+// 创建一个压缩链表
+unsigned char *ziplistNew(void);  
+
+// 合并两个压缩链表
 unsigned char *ziplistMerge(unsigned char **first, unsigned char **second);
+
+// 向表头/表尾添加一个节点
 unsigned char *ziplistPush(unsigned char *zl, unsigned char *s, unsigned int slen, int where);
+
+// 获取索引值为index的节点
 unsigned char *ziplistIndex(unsigned char *zl, int index);
+
+// 获取指定节点的下一个节点
 unsigned char *ziplistNext(unsigned char *zl, unsigned char *p);
+
+// 获取指定节点的上一个节点
 unsigned char *ziplistPrev(unsigned char *zl, unsigned char *p);
+
+// 获取指定节点的信息
 unsigned int ziplistGet(unsigned char *p, unsigned char **sval, unsigned int *slen, long long *lval);
+
+// 在指定节点后插入节点
 unsigned char *ziplistInsert(unsigned char *zl, unsigned char *p, unsigned char *s, unsigned int slen);
+
+// 删除指定节点
 unsigned char *ziplistDelete(unsigned char *zl, unsigned char **p);
+
+// 从指定的下标开始，删除num个节点
 unsigned char *ziplistDeleteRange(unsigned char *zl, int index, unsigned int num);
+
+// 比较两个节点的值
 unsigned int ziplistCompare(unsigned char *p, unsigned char *s, unsigned int slen);
+
+// 查找指定节点
 unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int vlen, unsigned int skip);
+
+// 获取链表长度
 unsigned int ziplistLen(unsigned char *zl);
+
+// 获取链表占用的总字节数 
 size_t ziplistBlobLen(unsigned char *zl);
 
 #ifdef REDIS_TEST

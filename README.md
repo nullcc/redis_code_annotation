@@ -12,7 +12,7 @@ Reids版本：3.2
 |:------------------|:------------------|:------------------
 | adlist.h 和 adlist.c  | 双端链表 | 100%
 | sds.h 和 sds.c | 简单动态字符串 | 100%
-| dict.h 和 dict.c | 字典 | 99%
+| dict.h 和 dict.c | 字典 | 95%
 | intset.h 和 intset.c | 整数集合 | 100%
 | ziplist.h 和 ziplist.c | 压缩链表 |
 | zipmap.h 和 zipmap.c | 压缩字典 |

@@ -1009,17 +1009,20 @@ unsigned char *ziplistIndex(unsigned char *zl, int index) {
  * p is the pointer to the current element
  *
  * The element after 'p' is returned, otherwise NULL if we are at the end. */
+/* 返回ziplist中当前节点的后置节点指针，如果当前节点是尾节点则返回NULL。 */
 unsigned char *ziplistNext(unsigned char *zl, unsigned char *p) {
     ((void) zl);
 
     /* "p" could be equal to ZIP_END, caused by ziplistDelete,
      * and we should return NULL. Otherwise, we should return NULL
      * when the *next* element is ZIP_END (there is no next entry). */
+    /* 由于调用ziplistDelete函数，p有可能等于ZIP_END，
+     * 这时应该返回NULL。否则，当后置节点为ZIP_END时返回NULL。 */
     if (p[0] == ZIP_END) {
         return NULL;
     }
 
-    p += zipRawEntryLength(p);
+    p += zipRawEntryLength(p);  // p加上当前节点长度为它的后置节点的地址
     if (p[0] == ZIP_END) {
         return NULL;
     }
@@ -1028,18 +1031,23 @@ unsigned char *ziplistNext(unsigned char *zl, unsigned char *p) {
 }
 
 /* Return pointer to previous entry in ziplist. */
+/* 返回ziplist当前节点的前置节点指针。 */
 unsigned char *ziplistPrev(unsigned char *zl, unsigned char *p) {
     unsigned int prevlensize, prevlen = 0;
 
     /* Iterating backwards from ZIP_END should return the tail. When "p" is
      * equal to the first element of the list, we're already at the head,
      * and should return NULL. */
+    /* 从ZIP_END开始向前迭代会返回尾节点。当p指向链表头节点时，返回NULL。 */
     if (p[0] == ZIP_END) {
+        // p指向ZIP_END时，返回链表尾节点
         p = ZIPLIST_ENTRY_TAIL(zl);
         return (p[0] == ZIP_END) ? NULL : p;
     } else if (p == ZIPLIST_ENTRY_HEAD(zl)) {
+        // p指向链表头节点时，返回NULL
         return NULL;
     } else {
+        // 获得p指向节点的前置节点长度，p减该长度即为当前节点前置节点
         ZIP_DECODE_PREVLEN(p, prevlensize, prevlen);
         assert(prevlen > 0);
         return p-prevlen;
@@ -1050,18 +1058,20 @@ unsigned char *ziplistPrev(unsigned char *zl, unsigned char *p) {
  * on the encoding of the entry. '*sstr' is always set to NULL to be able
  * to find out whether the string pointer or the integer value was set.
  * Return 0 if 'p' points to the end of the ziplist, 1 otherwise. */
+/* 获取p指向的节点的数据，根据其编码决定数据保存在*sstr（字符串）还是sval（整数）中。
+ * *sstr刚开始总是被设置为NULL。当p指向ziplist的尾部（ZIP_END）时返回0，否则返回1。 */
 unsigned int ziplistGet(unsigned char *p, unsigned char **sstr, unsigned int *slen, long long *sval) {
     zlentry entry;
     if (p == NULL || p[0] == ZIP_END) return 0;
     if (sstr) *sstr = NULL;
 
-    zipEntry(p, &entry);
-    if (ZIP_IS_STR(entry.encoding)) {
+    zipEntry(p, &entry);  // 初始化entry为当前节点
+    if (ZIP_IS_STR(entry.encoding)) {  // 当前节点为字符串，数据保存在*sstr
         if (sstr) {
             *slen = entry.len;
             *sstr = p+entry.headersize;
         }
-    } else {
+    } else {  // 当前节点为整数，数据保存在*sval
         if (sval) {
             *sval = zipLoadInteger(p+entry.headersize,entry.encoding);
         }
@@ -1070,6 +1080,7 @@ unsigned int ziplistGet(unsigned char *p, unsigned char **sstr, unsigned int *sl
 }
 
 /* Insert an entry at "p". */
+/* 向ziplist中p指向的节点处插入一个节点 */
 unsigned char *ziplistInsert(unsigned char *zl, unsigned char *p, unsigned char *s, unsigned int slen) {
     return __ziplistInsert(zl,p,s,slen);
 }
@@ -1077,15 +1088,17 @@ unsigned char *ziplistInsert(unsigned char *zl, unsigned char *p, unsigned char 
 /* Delete a single entry from the ziplist, pointed to by *p.
  * Also update *p in place, to be able to iterate over the
  * ziplist, while deleting entries. */
+/* 从ziplist中删除p指向的节点。还就地更新了*p，以使得在删除节点的时候还能迭代ziplist。 */
 unsigned char *ziplistDelete(unsigned char *zl, unsigned char **p) {
-    size_t offset = *p-zl;
-    zl = __ziplistDelete(zl,*p,1);
+    size_t offset = *p-zl;  // 当前节点的偏移量
+    zl = __ziplistDelete(zl,*p,1);  // 从ziplist中删除当前节点，由于ziplistDelete会调用realloc，zl有可能会发生变化
 
     /* Store pointer to current element in p, because ziplistDelete will
      * do a realloc which might result in a different "zl"-pointer.
      * When the delete direction is back to front, we might delete the last
      * entry and end up with "p" pointing to ZIP_END, so check this. */
-    *p = zl+offset;
+    /* 事先在p中保存当前元素的指针，因为ziplistDelete会调用realloc，有可能会导致zl指针发生变化。 */
+    *p = zl+offset;  // 更新了*p，此时*p指向的是被删除节点的后置节点，可以继续使用这个指针进行迭代。
     return zl;
 }
 
@@ -1097,15 +1110,17 @@ unsigned char *ziplistDeleteRange(unsigned char *zl, int index, unsigned int num
 
 /* Compare entry pointer to by 'p' with 'sstr' of length 'slen'. */
 /* Return 1 if equal. */
+/* 比较p指向节点的值和sstr指向的长度为slen的数据，当相等时返回1，否则返回0。 */
 unsigned int ziplistCompare(unsigned char *p, unsigned char *sstr, unsigned int slen) {
     zlentry entry;
     unsigned char sencoding;
     long long zval, sval;
     if (p[0] == ZIP_END) return 0;
 
-    zipEntry(p, &entry);
+    zipEntry(p, &entry);  // entry为p指向的节点
     if (ZIP_IS_STR(entry.encoding)) {
         /* Raw compare */
+        /* entry的值是字符串 */
         if (entry.len == slen) {
             return memcmp(p+entry.headersize,sstr,slen) == 0;
         } else {
@@ -1114,6 +1129,7 @@ unsigned int ziplistCompare(unsigned char *p, unsigned char *sstr, unsigned int 
     } else {
         /* Try to compare encoded values. Don't compare encoding because
          * different implementations may encoded integers differently. */
+        /* entry的值是整数，此时不比较编码类型，因为不同编码类型的位数不同，只比较值是否相等。 */
         if (zipTryEncoding(sstr,slen,&sval,&sencoding)) {
           zval = zipLoadInteger(p+entry.headersize,entry.encoding);
           return zval == sval;
@@ -1124,8 +1140,10 @@ unsigned int ziplistCompare(unsigned char *p, unsigned char *sstr, unsigned int 
 
 /* Find pointer to the entry equal to the specified entry. Skip 'skip' entries
  * between every comparison. Returns NULL when the field could not be found. */
+/* 在ziplist中查找与指定节点相等的节点。每次比较后跳过skip个节点。
+ * 没有找到相应节点时返回NULL。 */
 unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int vlen, unsigned int skip) {
-    int skipcnt = 0;
+    int skipcnt = 0;  // 已经跳过的节点数
     unsigned char vencoding = 0;
     long long vll = 0;
 
@@ -1133,13 +1151,16 @@ unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int v
         unsigned int prevlensize, encoding, lensize, len;
         unsigned char *q;
 
-        ZIP_DECODE_PREVLENSIZE(p, prevlensize);
-        ZIP_DECODE_LENGTH(p + prevlensize, encoding, lensize, len);
-        q = p + prevlensize + lensize;
+        ZIP_DECODE_PREVLENSIZE(p, prevlensize);  // 保存当前节点的前置节点长度所需的字节数
+        ZIP_DECODE_LENGTH(p + prevlensize, encoding, lensize, len);  // 获取当前节点的encoding、lensize和len
+
+        q = p + prevlensize + lensize;  // 当前节点value域指针
 
         if (skipcnt == 0) {
             /* Compare current entry with specified entry */
+            /* 比较当前节点和给定节点的值 */
             if (ZIP_IS_STR(encoding)) {
+                // 当前节点的值为字符串
                 if (len == vlen && memcmp(q, vstr, vlen) == 0) {
                     return p;
                 }
@@ -1147,6 +1168,9 @@ unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int v
                 /* Find out if the searched field can be encoded. Note that
                  * we do it only the first time, once done vencoding is set
                  * to non-zero and vll is set to the integer value. */
+                /* 判断vstr指向的数据能否被编码成整数，这个操作只做一次，
+                 * 一旦判定为可以被编码成整数，vencoding被设置为非0值且vll被设置成一对应的整数。
+                 * 如果不能，vencoding被设置为UCHAR_MAX。 */
                 if (vencoding == 0) {
                     if (!zipTryEncoding(vstr, vlen, &vll, &vencoding)) {
                         /* If the entry can't be encoded we set it to
@@ -1161,7 +1185,8 @@ unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int v
                 /* Compare current entry with specified entry, do it only
                  * if vencoding != UCHAR_MAX because if there is no encoding
                  * possible for the field it can't be a valid integer. */
-                if (vencoding != UCHAR_MAX) {
+                /* 只有当vencoding != UCHAR_MAX时才能以整数比较当前节点和给定节点的值。 */
+                if (vencoding != UCHAR_MAX) {  // vstr指向的值可以被以整数编码
                     long long ll = zipLoadInteger(q, encoding);
                     if (ll == vll) {
                         return p;
@@ -1177,6 +1202,7 @@ unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int v
         }
 
         /* Move to next entry */
+        /* 移动到下个节点 */
         p = q + len;
     }
 
@@ -1184,28 +1210,33 @@ unsigned char *ziplistFind(unsigned char *p, unsigned char *vstr, unsigned int v
 }
 
 /* Return length of ziplist. */
+/* 返回ziplist的节点数量 */
 unsigned int ziplistLen(unsigned char *zl) {
     unsigned int len = 0;
     if (intrev16ifbe(ZIPLIST_LENGTH(zl)) < UINT16_MAX) {
+        // 如果ziplist的节点数量小于UINT16_MAX，直接取ziplist header中存放的节点数量
         len = intrev16ifbe(ZIPLIST_LENGTH(zl));
     } else {
-        unsigned char *p = zl+ZIPLIST_HEADER_SIZE;
-        while (*p != ZIP_END) {
+        unsigned char *p = zl+ZIPLIST_HEADER_SIZE;  // ziplist头节点指针
+        while (*p != ZIP_END) {  // 遍历ziplist计算节点数量
             p += zipRawEntryLength(p);
             len++;
         }
 
         /* Re-store length if small enough */
+        /* 如果实际计算出来的长度小于UINT16_MAX，更新ziplist header中的节点数量 */
         if (len < UINT16_MAX) ZIPLIST_LENGTH(zl) = intrev16ifbe(len);
     }
     return len;
 }
 
 /* Return ziplist blob size in bytes. */
+/* 获取链表占用的总字节数。 */
 size_t ziplistBlobLen(unsigned char *zl) {
     return intrev32ifbe(ZIPLIST_BYTES(zl));
 }
 
+/* ziplist信息可读化输出 */
 void ziplistRepr(unsigned char *zl) {
     unsigned char *p;
     int index = 0;

@@ -32,18 +32,39 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* 压缩字典 */
+
 #ifndef _ZIPMAP_H
 #define _ZIPMAP_H
 
+// 创建一个新的zipmap
 unsigned char *zipmapNew(void);
+
+// 对zipmap设置key-value
 unsigned char *zipmapSet(unsigned char *zm, unsigned char *key, unsigned int klen, unsigned char *val, unsigned int vlen, int *update);
+
+// 删除zipmap中的指定key 
 unsigned char *zipmapDel(unsigned char *zm, unsigned char *key, unsigned int klen, int *deleted);
+
+// 在使用zipmapNext()函数遍历zipmap之前调用
 unsigned char *zipmapRewind(unsigned char *zm);
+
+// 获取当前key的value，并返回下一个节点的地址
 unsigned char *zipmapNext(unsigned char *zm, unsigned char **key, unsigned int *klen, unsigned char **value, unsigned int *vlen);
+
+// 获取指定key对应的value
 int zipmapGet(unsigned char *zm, unsigned char *key, unsigned int klen, unsigned char **value, unsigned int *vlen);
+
+// 查询是否存在指定key
 int zipmapExists(unsigned char *zm, unsigned char *key, unsigned int klen);
+
+// 获取zipmap节点数量
 unsigned int zipmapLen(unsigned char *zm);
+
+// 获取zipmap占用的字节数量
 size_t zipmapBlobLen(unsigned char *zm);
+
+// zipmap信息可读化输出
 void zipmapRepr(unsigned char *p);
 
 #ifdef REDIS_TEST

@@ -15,6 +15,6 @@ Reids版本：3.2
 | dict.h 和 dict.c | 字典 | 95%
 | intset.h 和 intset.c | 整数集合 | 100%
 | ziplist.h 和 ziplist.c | 压缩链表 | 100%
-| zipmap.h 和 zipmap.c | 压缩字典 |
+| zipmap.h 和 zipmap.c | 压缩字典 | 100%
 | geo.h 和 geo.c | 地理位置 |
 | hyperloglog.c | hyperloglog算法 |

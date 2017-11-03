@@ -46,7 +46,7 @@ unsigned char *zipmapSet(unsigned char *zm, unsigned char *key, unsigned int kle
 // 删除zipmap中的指定key 
 unsigned char *zipmapDel(unsigned char *zm, unsigned char *key, unsigned int klen, int *deleted);
 
-// 在使用zipmapNext()函数遍历zipmap之前调用
+// 在使用zipmapNext()函数遍历zipmap之前调用，用于跳过zipmap开头1字节的zmlen
 unsigned char *zipmapRewind(unsigned char *zm);
 
 // 获取当前key的value，并返回下一个节点的地址

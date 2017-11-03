@@ -28,7 +28,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* 压缩链表 */
+/* 压缩链表 
+ * zipmap使用字符串实现了简单hash表，在元素数量较少（0~254个）的情况下可以节省内存。
+ * */
 
 #ifndef _ZIPLIST_H
 #define _ZIPLIST_H

@@ -46,6 +46,7 @@
 
 /* Include the best multiplexing layer supported by this system.
  * The following should be ordered by performances, descending. */
+/* 包含了系统支持的最佳的I/O多路复用机制。下面的异步I/O按照性能顺序降序排列。 */
 #ifdef HAVE_EVPORT
 #include "ae_evport.c"
 #else
@@ -60,28 +61,31 @@
     #endif
 #endif
 
+/* 创建一个事件循环 */
 aeEventLoop *aeCreateEventLoop(int setsize) {
     aeEventLoop *eventLoop;
     int i;
 
     if ((eventLoop = zmalloc(sizeof(*eventLoop))) == NULL) goto err;
-    eventLoop->events = zmalloc(sizeof(aeFileEvent)*setsize);
-    eventLoop->fired = zmalloc(sizeof(aeFiredEvent)*setsize);
+    eventLoop->events = zmalloc(sizeof(aeFileEvent)*setsize);  // 分配已注册的文件事件数组空间
+    eventLoop->fired = zmalloc(sizeof(aeFiredEvent)*setsize);  // 分配已触发的事件数组空间
     if (eventLoop->events == NULL || eventLoop->fired == NULL) goto err;
-    eventLoop->setsize = setsize;
-    eventLoop->lastTime = time(NULL);
-    eventLoop->timeEventHead = NULL;
-    eventLoop->timeEventNextId = 0;
-    eventLoop->stop = 0;
-    eventLoop->maxfd = -1;
-    eventLoop->beforesleep = NULL;
-    if (aeApiCreate(eventLoop) == -1) goto err;
+    eventLoop->setsize = setsize;  // 设置文件描述符的最大监听数
+    eventLoop->lastTime = time(NULL);  // 上一次检测的系统时间
+    eventLoop->timeEventHead = NULL;  // 已注册的时间事件数组
+    eventLoop->timeEventNextId = 0;  // 下一个生成的时间事件id
+    eventLoop->stop = 0;  // 事件循环停止标志，0表示正在运行
+    eventLoop->maxfd = -1;  // 当前已经注册的最大文件描述符的值，初始为-1
+    eventLoop->beforesleep = NULL;  // 事件循环每次处理事件前要调用的函数初始为NULL
+    if (aeApiCreate(eventLoop) == -1) goto err;  // 用系统底层API创建事件循环
     /* Events with mask == AE_NONE are not set. So let's initialize the
      * vector with it. */
+    /* 初始化已注册的文件事件数组中元素的mask为 AE_NONE */
     for (i = 0; i < setsize; i++)
         eventLoop->events[i].mask = AE_NONE;
     return eventLoop;
 
+/* 创建事件循环出错，释放分配的空间 */
 err:
     if (eventLoop) {
         zfree(eventLoop->events);
@@ -92,6 +96,7 @@ err:
 }
 
 /* Return the current set size. */
+/* 返回事件循环的文件描述符的最大监听数 */
 int aeGetSetSize(aeEventLoop *eventLoop) {
     return eventLoop->setsize;
 }
@@ -103,87 +108,110 @@ int aeGetSetSize(aeEventLoop *eventLoop) {
  * performed at all.
  *
  * Otherwise AE_OK is returned and the operation is successful. */
+/* 调整事件循环的文件描述符的最大监听数。
+ * 如果传入的参数setsize小于当前setsize，且当前存在一个大于传入的setsize的文件描述符
+ * ，函数返回AE_ERR且不会执行任何操作。
+ * 
+ * 否则返回AE_OK且调整操作执行成功。 */
 int aeResizeSetSize(aeEventLoop *eventLoop, int setsize) {
     int i;
 
+    // 入参setsize和当前setsize相同，返回AE_OK但什么也不做
     if (setsize == eventLoop->setsize) return AE_OK;
+
+    // 事件循环当前已经注册的最大文件描述符的值大于入参setsize，返回失败
     if (eventLoop->maxfd >= setsize) return AE_ERR;
+
+    // 调用系统底层API来设置事件循环setsize，失败即返回AE_ERR
     if (aeApiResize(eventLoop,setsize) == -1) return AE_ERR;
 
+    // 重新分配事件循环的已注册的文件事件数组和已被触发的事件数组的空间，并更新setsize
     eventLoop->events = zrealloc(eventLoop->events,sizeof(aeFileEvent)*setsize);
     eventLoop->fired = zrealloc(eventLoop->fired,sizeof(aeFiredEvent)*setsize);
     eventLoop->setsize = setsize;
 
     /* Make sure that if we created new slots, they are initialized with
      * an AE_NONE mask. */
+    /* 把新增加的事件元素的mask初始化为AE_NONE */
     for (i = eventLoop->maxfd+1; i < setsize; i++)
         eventLoop->events[i].mask = AE_NONE;
     return AE_OK;
 }
 
+/* 删除一个事件循环 */
 void aeDeleteEventLoop(aeEventLoop *eventLoop) {
-    aeApiFree(eventLoop);
+    aeApiFree(eventLoop);  // 调用相应的系统底层API的释放函数
     zfree(eventLoop->events);
     zfree(eventLoop->fired);
     zfree(eventLoop);
 }
 
+/* 停止一个事件循环 */
 void aeStop(aeEventLoop *eventLoop) {
     eventLoop->stop = 1;
 }
 
+/* 创建文件事件 */
 int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
         aeFileProc *proc, void *clientData)
 {
+    // 入参fd大于事件循环支持的文件描述符的最大监听数，返回失败
     if (fd >= eventLoop->setsize) {
         errno = ERANGE;
         return AE_ERR;
     }
-    aeFileEvent *fe = &eventLoop->events[fd];
+    aeFileEvent *fe = &eventLoop->events[fd];  // 从文件事件数组中以fd为下标获取一个文件事件
 
+    // 调用系统底层API增加一个事件，失败即返回AE_ERR
     if (aeApiAddEvent(eventLoop, fd, mask) == -1)
         return AE_ERR;
     fe->mask |= mask;
-    if (mask & AE_READABLE) fe->rfileProc = proc;
-    if (mask & AE_WRITABLE) fe->wfileProc = proc;
-    fe->clientData = clientData;
-    if (fd > eventLoop->maxfd)
+    if (mask & AE_READABLE) fe->rfileProc = proc;  // 设置读事件处理函数
+    if (mask & AE_WRITABLE) fe->wfileProc = proc;  // 设置写事件处理函数
+    fe->clientData = clientData;  // 设置传递给读/写事件处理函数的数据
+    if (fd > eventLoop->maxfd)  // 更新当前已经注册的最大文件描述符的值
         eventLoop->maxfd = fd;
     return AE_OK;
 }
 
+/* 删除文件事件 */
 void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
 {
-    if (fd >= eventLoop->setsize) return;
-    aeFileEvent *fe = &eventLoop->events[fd];
-    if (fe->mask == AE_NONE) return;
+    if (fd >= eventLoop->setsize) return;  // 不存在fd大于setsize的文件事件，什么也不做
+    aeFileEvent *fe = &eventLoop->events[fd];  // 获取这个文件事件元素
+    if (fe->mask == AE_NONE) return;  // 发现这个文件事件元素没有绑定任何文件事件，无需删除
 
-    aeApiDelEvent(eventLoop, fd, mask);
+    aeApiDelEvent(eventLoop, fd, mask);  // 调用系统底层API删除事件
     fe->mask = fe->mask & (~mask);
+    // 如果fd等于事件循环的maxfd且文件事件元素未被注册时，更新maxfd
     if (fd == eventLoop->maxfd && fe->mask == AE_NONE) {
         /* Update the max fd */
         int j;
-
+        
+        // 从后向前遍历文件事件数组，找到最大的已注册的最大文件描述符的值，用它更新maxfd
         for (j = eventLoop->maxfd-1; j >= 0; j--)
             if (eventLoop->events[j].mask != AE_NONE) break;
         eventLoop->maxfd = j;
     }
 }
 
+/* 通过文件描述符获取文件事件，返回事件状态 */
 int aeGetFileEvents(aeEventLoop *eventLoop, int fd) {
+    // 入参fd大于事件循环支持的文件描述符的最大监听数，返回0
     if (fd >= eventLoop->setsize) return 0;
-    aeFileEvent *fe = &eventLoop->events[fd];
+    aeFileEvent *fe = &eventLoop->events[fd];  // 获取这个文件事件元素
 
-    return fe->mask;
+    return fe->mask;  // AE_READABLE或AE_WRITABLE
 }
 
+/* 获取当前的精确时间，将秒数保存在*seconds，毫秒数保存在*milliseconds */
 static void aeGetTime(long *seconds, long *milliseconds)
 {
     struct timeval tv;
 
-    gettimeofday(&tv, NULL);
-    *seconds = tv.tv_sec;
-    *milliseconds = tv.tv_usec/1000;
+    gettimeofday(&tv, NULL);  // 获取当前的精确时间
+    *seconds = tv.tv_sec;  // 获取秒数
+    *milliseconds = tv.tv_usec/1000;  // 获取毫秒数
 }
 
 static void aeAddMillisecondsToNow(long long milliseconds, long *sec, long *ms) {

@@ -41,6 +41,7 @@
 #define AE_OK 0
 #define AE_ERR -1
 
+// 事件状态为不可用
 #define AE_NONE 0
 
 // 事件可读
@@ -144,19 +145,19 @@ typedef struct aeEventLoop {
     // 用于检测系统时间是否发生变化
     time_t lastTime;     /* Used to detect system clock skew */
 
-    // 已注册的文件事件
+    // 已注册的文件事件数组
     aeFileEvent *events; /* Registered events */
 
-    // 已被触发的事件
+    // 已被触发的事件数组
     aeFiredEvent *fired; /* Fired events */
 
-    // 已注册的时间事件
+    // 已注册的时间事件数组
     aeTimeEvent *timeEventHead;
 
-    // 事件循环停止标志，1表示停止
+    // 事件循环停止标志，0表示正在运行，1表示停止
     int stop;
 
-    // 
+    // 系统底层调用的API使用的数据
     void *apidata; /* This is used for polling API specific data */
 
     // 事件循环处理事件前调用该函数，如果没有事件则睡眠
@@ -180,7 +181,7 @@ int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
 // 删除文件事件
 void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask);
 
-// 通过文件描述符获取文件事件
+// 通过文件描述符获取文件事件，返回事件状态
 int aeGetFileEvents(aeEventLoop *eventLoop, int fd);
 
 // 创建时间事件
@@ -200,7 +201,7 @@ int aeWait(int fd, int mask, long long milliseconds);
 // 事件循环主函数
 void aeMain(aeEventLoop *eventLoop);
 
-// 
+// 获取系统底层API的名称
 char *aeGetApiName(void);
 
 // 设置每次事件循环前调用的函数

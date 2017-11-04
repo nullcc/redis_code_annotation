@@ -1,6 +1,6 @@
 # Redis代码注释
 
-Reids版本：3.2
+Reids版本：3.2.11
 
 本注释版本不会删除原始代码中的任何东西，只会增加注释。
 
@@ -16,5 +16,4 @@ Reids版本：3.2
 | intset.h 和 intset.c | 整数集合 | 100%
 | ziplist.h 和 ziplist.c | 压缩链表 | 100%
 | zipmap.h 和 zipmap.c | 压缩字典 | 100%
-| geo.h 和 geo.c | 地理位置 |
-| hyperloglog.c | hyperloglog算法 |
+| ae.h 和 ae.c | 事件 | 

@@ -16,4 +16,8 @@ Reids版本：3.2.11
 | intset.h 和 intset.c | 整数集合 | 100%
 | ziplist.h 和 ziplist.c | 压缩链表 | 100%
 | zipmap.h 和 zipmap.c | 压缩字典 | 100%
-| ae.h 和 ae.c | 事件 | 
+| ae.h 和 ae.c | 异步I/O事件 | 100%
+| ae_epoll.c | Linux epoll | 
+| ae_evport.c | 事件端口 | 
+| ae_kqueue.c | Kqueue | 
+| ae_select.c | Select | 

@@ -53,16 +53,19 @@
 // 文件事件
 #define AE_FILE_EVENTS 1
 
-// 时间事件
+// 定时器事件
 #define AE_TIME_EVENTS 2
 
 // 所有事件类型
 #define AE_ALL_EVENTS (AE_FILE_EVENTS|AE_TIME_EVENTS)
 
-// 不等待事件
+// 无须等待的事件
 #define AE_DONT_WAIT 4
 
+// 表示事件还未处理完
 #define AE_NOMORE -1
+
+// 表示事件已被移除
 #define AE_DELETED_EVENT_ID -1
 
 /* Macros */
@@ -74,7 +77,7 @@ struct aeEventLoop;
 // 文件事件处理函数
 typedef void aeFileProc(struct aeEventLoop *eventLoop, int fd, void *clientData, int mask);
 
-// 时间事件处理函数，返回定时的时长
+// 定时器事件处理函数，返回定时器的时长，如果是一个正数表示循环定时器
 typedef int aeTimeProc(struct aeEventLoop *eventLoop, long long id, void *clientData);
 
 // 事件处理结束时调用的函数
@@ -99,27 +102,27 @@ typedef struct aeFileEvent {
 } aeFileEvent;
 
 /* Time event structure */
-/* 时间事件结构体 */
+/* 定时器事件结构体 */
 typedef struct aeTimeEvent {
-    // 时间事件标识符
+    // 定时器事件标识符
     long long id; /* time event identifier. */
 
-    // 超时秒数
+    // 触发时间秒数
     long when_sec; /* seconds */
 
-    // 超时毫秒数
+    // 触发时间毫秒数
     long when_ms; /* milliseconds */
 
-    // 时间事件处理程序
+    // 定时器事件处理程序
     aeTimeProc *timeProc;
 
-    // 时间事件的最后处理程序，如果设置了该属性，会在时间事件被删除时调用
+    // 定时器事件的最后处理程序，如果设置了该属性，会在定时器事件被删除时调用
     aeEventFinalizerProc *finalizerProc;
 
-    // 传递给时间事件处理程序的数据
+    // 传递给定时器事件处理程序的数据
     void *clientData;
 
-    // 后置时间事件节点
+    // 后置定时器事件节点
     struct aeTimeEvent *next;
 } aeTimeEvent;
 
@@ -139,10 +142,10 @@ typedef struct aeEventLoop {
     // 文件描述符的最大监听数
     int setsize; /* max number of file descriptors tracked */
 
-    // 下一个时间事件id，用于生成时间事件
+    // 下一个定时器事件id，用于生成定时器事件
     long long timeEventNextId;
 
-    // 用于检测系统时间是否发生变化
+    // 上一次获取的系统时间，用于检测系统时间是否发生变化
     time_t lastTime;     /* Used to detect system clock skew */
 
     // 已注册的文件事件数组
@@ -151,7 +154,7 @@ typedef struct aeEventLoop {
     // 已被触发的事件数组
     aeFiredEvent *fired; /* Fired events */
 
-    // 已注册的时间事件数组
+    // 已注册的定时器事件数组头部
     aeTimeEvent *timeEventHead;
 
     // 事件循环停止标志，0表示正在运行，1表示停止
@@ -184,12 +187,12 @@ void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask);
 // 通过文件描述符获取文件事件，返回事件状态
 int aeGetFileEvents(aeEventLoop *eventLoop, int fd);
 
-// 创建时间事件
+// 创建定时器事件
 long long aeCreateTimeEvent(aeEventLoop *eventLoop, long long milliseconds,
         aeTimeProc *proc, void *clientData,
         aeEventFinalizerProc *finalizerProc);
 
-// 删除时间事件
+// 删除定时器事件
 int aeDeleteTimeEvent(aeEventLoop *eventLoop, long long id);
 
 // 在事件循环中处理事件，在aeMain中被调用
@@ -204,7 +207,7 @@ void aeMain(aeEventLoop *eventLoop);
 // 获取系统底层API的名称
 char *aeGetApiName(void);
 
-// 设置每次事件循环前调用的函数
+// 设置事件循环中每次进入事件处理过程之前前调用的函数
 void aeSetBeforeSleepProc(aeEventLoop *eventLoop, aeBeforeSleepProc *beforesleep);
 
 // 获取事件循环的文件描述符的最大监听数

@@ -552,7 +552,7 @@ void aeMain(aeEventLoop *eventLoop) {
     }
 }
 
-/* 获取系统底层API的名称 */
+/* 获取底层I/O具体使用的API名称 */
 char *aeGetApiName(void) {
     return aeApiName();
 }

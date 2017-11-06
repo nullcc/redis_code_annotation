@@ -28,6 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* 对TCP socket的基本封装 */
+
 #include "fmacros.h"
 
 #include <sys/types.h>
@@ -58,12 +60,15 @@ static void anetSetError(char *err, const char *fmt, ...)
     va_end(ap);
 }
 
+/* 设置某个socket fd为阻塞或非阻塞状态 */
 int anetSetBlock(char *err, int fd, int non_block) {
     int flags;
 
     /* Set the socket blocking (if non_block is zero) or non-blocking.
      * Note that fcntl(2) for F_GETFL and F_SETFL can't be
      * interrupted by a signal. */
+    /* 设置指定的socket为阻塞（non_block参数为零）或非阻塞（non_block参数为非零）。
+     * 注意，使用F_GETFL和F_SETFL调用fcntl()函数事不能被信号中断。 */
     if ((flags = fcntl(fd, F_GETFL)) == -1) {
         anetSetError(err, "fcntl(F_GETFL): %s", strerror(errno));
         return ANET_ERR;
@@ -81,10 +86,12 @@ int anetSetBlock(char *err, int fd, int non_block) {
     return ANET_OK;
 }
 
+/* 设置fd为非阻塞 */
 int anetNonBlock(char *err, int fd) {
     return anetSetBlock(err,fd,1);
 }
 
+/* 设置fd为阻塞 */
 int anetBlock(char *err, int fd) {
     return anetSetBlock(err,fd,0);
 }
@@ -92,6 +99,8 @@ int anetBlock(char *err, int fd) {
 /* Set TCP keep alive option to detect dead peers. The interval option
  * is only used for Linux as we are using Linux-specific APIs to set
  * the probe send time, interval, and count. */
+/* 设置TCP保活选项来检测不活跃的对端。其中的interval选项只用于Linux，
+ * 因为函数使用了只有Linux平台支持的API来设置探测发送时间、间隔和计数。 */
 int anetKeepAlive(char *err, int fd, int interval)
 {
     int val = 1;
@@ -106,9 +115,13 @@ int anetKeepAlive(char *err, int fd, int interval)
     /* Default settings are more or less garbage, with the keepalive time
      * set to 7200 by default on Linux. Modify settings to make the feature
      * actually useful. */
+    /* 默认设置意义不大，Linux下保活时间默认是7200秒。修改此设置以让此功能更实用。 */
 
     /* Send first probe after interval. */
+    /* 到达间隔事件后发送第一次探测。 */
     val = interval;
+
+    // 设置对一个连接进行活跃探测之前运行的最大非活跃时间间隔 
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
         anetSetError(err, "setsockopt TCP_KEEPIDLE: %s\n", strerror(errno));
         return ANET_ERR;
@@ -117,6 +130,8 @@ int anetKeepAlive(char *err, int fd, int interval)
     /* Send next probes after the specified interval. Note that we set the
      * delay as interval / 3, as we send three probes before detecting
      * an error (see the next setsockopt call). */
+    /* 在指定的时间间隔之后发送下一次探测。注意我们把这次的时间间隔设置为原来的1/3，
+     * 因为我们在检测到一个错误之前发送了三次探测。 */
     val = interval/3;
     if (val == 0) val = 1;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {
@@ -126,6 +141,7 @@ int anetKeepAlive(char *err, int fd, int interval)
 
     /* Consider the socket in error state after three we send three ACK
      * probes without getting a reply. */
+    // 设置关闭一个非活跃连接之前进行探测的最大次数
     val = 3;
     if (setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {
         anetSetError(err, "setsockopt TCP_KEEPCNT: %s\n", strerror(errno));
@@ -138,8 +154,13 @@ int anetKeepAlive(char *err, int fd, int interval)
     return ANET_OK;
 }
 
+/* 将tcp连接设为非延迟性的，即禁用Nagle算法（设置了TCP_NODELAY选项）
+ * 在TCP中，会通过使用Nagle算法来将未确认的数据放入缓冲区直至达到一个包大小时一起发送出去，
+ * 这可以减少主机发送零碎的小数据包的数目，提升传输效率，但这么做会增加传输延迟。
+ *  */
 static int anetSetTcpNoDelay(char *err, int fd, int val)
-{
+{   
+    // 禁用Nagle算法，主机一有数据就会立即发送出去
     if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val)) == -1)
     {
         anetSetError(err, "setsockopt TCP_NODELAY: %s", strerror(errno));
@@ -148,17 +169,19 @@ static int anetSetTcpNoDelay(char *err, int fd, int val)
     return ANET_OK;
 }
 
+/* 将tcp连接设为非延迟性的，即禁用Nagle算法，内部调用anetSetTcpNoDelay() */
 int anetEnableTcpNoDelay(char *err, int fd)
 {
     return anetSetTcpNoDelay(err, fd, 1);
 }
 
+/* 启用Nagle算法，内部调用anetSetTcpNoDelay() */
 int anetDisableTcpNoDelay(char *err, int fd)
 {
     return anetSetTcpNoDelay(err, fd, 0);
 }
 
-
+/* 设置发送缓冲区的大小 */
 int anetSetSendBuffer(char *err, int fd, int buffsize)
 {
     if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &buffsize, sizeof(buffsize)) == -1)
@@ -169,6 +192,7 @@ int anetSetSendBuffer(char *err, int fd, int buffsize)
     return ANET_OK;
 }
 
+/* 启用TCP连接保活定时器 */
 int anetTcpKeepAlive(char *err, int fd)
 {
     int yes = 1;
@@ -181,6 +205,8 @@ int anetTcpKeepAlive(char *err, int fd)
 
 /* Set the socket send timeout (SO_SNDTIMEO socket option) to the specified
  * number of milliseconds, or disable it if the 'ms' argument is zero. */
+/* 设置socket发送超时时间（使用SO_SNDTIMEO选项）来指定以毫秒为单位的超时事件，
+ * 如果ms参数为0，则表示禁用socket发送超时事件。 */
 int anetSendTimeout(char *err, int fd, long long ms) {
     struct timeval tv;
 

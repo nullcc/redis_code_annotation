@@ -28,6 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* 对TCP socket的基本封装 */
+ 
 #ifndef ANET_H
 #define ANET_H
 
@@ -49,32 +51,85 @@
 #undef ip_len
 #endif
 
+// 进行TCP的阻塞连接
 int anetTcpConnect(char *err, char *addr, int port);
+
+// 进行TCP非阻塞连接
 int anetTcpNonBlockConnect(char *err, char *addr, int port);
+
+// 进行TCP非阻塞连接，并绑定源地址
 int anetTcpNonBlockBindConnect(char *err, char *addr, int port, char *source_addr);
+
+// 进行TCP非阻塞的尽力而为的连接，并绑定源地址
 int anetTcpNonBlockBestEffortBindConnect(char *err, char *addr, int port, char *source_addr);
+
+// 进行Unix的阻塞连接
 int anetUnixConnect(char *err, char *path);
+
+// 进行Unix的非阻塞连接
 int anetUnixNonBlockConnect(char *err, char *path);
+
+// 对read()的封装，把网络连接fd中的数据读取到buf中，读取count个字节
 int anetRead(int fd, char *buf, int count);
+
+// 解析主机名
 int anetResolve(char *err, char *host, char *ipbuf, size_t ipbuf_len);
+
+// 仅仅解析IP
 int anetResolveIP(char *err, char *host, char *ipbuf, size_t ipbuf_len);
+
+// 创建soekct server
 int anetTcpServer(char *err, int port, char *bindaddr, int backlog);
+
+// 创建只能发送和接收ipv6的socket的server 
 int anetTcp6Server(char *err, int port, char *bindaddr, int backlog);
+
+// 创建unix域的socket的server
 int anetUnixServer(char *err, char *path, mode_t perm, int backlog);
+
+// 获取TCP连接请求并建立连接
 int anetTcpAccept(char *err, int serversock, char *ip, size_t ip_len, int *port);
+
+// 获取Unix域连接请求并建立连接
 int anetUnixAccept(char *err, int serversock);
+
+// 对write()的封装，使用buf中的数据向网络fd写入数据，写入count个字节
 int anetWrite(int fd, char *buf, int count);
+
+// 设置某个网络fd为非阻塞
 int anetNonBlock(char *err, int fd);
+
+// 设置某个网络fd为阻塞
 int anetBlock(char *err, int fd);
+
+// 将tcp连接设为非延迟性的,即屏蔽Nagle算法
 int anetEnableTcpNoDelay(char *err, int fd);
+
+// 将tcp连接设为延迟性的,即启用Nagle算法
 int anetDisableTcpNoDelay(char *err, int fd);
+
+// 启用TCP连接保活定时器
 int anetTcpKeepAlive(char *err, int fd);
+
+// 设置socket发送超时时间
 int anetSendTimeout(char *err, int fd, long long ms);
+
+// 获取对端fd的地(IP+port)
 int anetPeerToString(int fd, char *ip, size_t ip_len, int *port);
+
+// 设置TCP连接一直存活，用来检测非活跃状态的节点，interval为检测间隔时间
 int anetKeepAlive(char *err, int fd, int interval);
+
+// 获取本机fd地址(IP+port)
 int anetSockName(int fd, char *ip, size_t ip_len, int *port);
+
+// 将一个ip,port对格式化成一个方便解析的格式
 int anetFormatAddr(char *fmt, size_t fmt_len, char *ip, int port);
+
+// 将对端fd的ip,port对格式化成一个方便解析的格式
 int anetFormatPeer(int fd, char *fmt, size_t fmt_len);
+
+// 将本机fd的ip,port对格式化成一个方便解析的格式
 int anetFormatSock(int fd, char *fmt, size_t fmt_len);
 
 #endif

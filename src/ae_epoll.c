@@ -28,53 +28,64 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* Linux epoll()的抽象层，在系统的epoll()上包装了一层以便可以使用一致的接口调用 */
 
 #include <sys/epoll.h>
 
+
 typedef struct aeApiState {
-    int epfd;
+    int epfd;  // 由epoll_create生成的epoll专用文件描述符
     struct epoll_event *events;
 } aeApiState;
 
+/* 底层事件API的统一接口 */
 static int aeApiCreate(aeEventLoop *eventLoop) {
     aeApiState *state = zmalloc(sizeof(aeApiState));
 
     if (!state) return -1;
+
+    // 创建文件事件数组
     state->events = zmalloc(sizeof(struct epoll_event)*eventLoop->setsize);
     if (!state->events) {
         zfree(state);
         return -1;
     }
+
+    // 创建epoll专用文件描述符
     state->epfd = epoll_create(1024); /* 1024 is just a hint for the kernel */
     if (state->epfd == -1) {
         zfree(state->events);
         zfree(state);
         return -1;
     }
-    eventLoop->apidata = state;
+    eventLoop->apidata = state;  // 初始化系统底层调用的API使用的数据
     return 0;
 }
 
+/* 调整事件循环文件描述符的最大监听数 */
 static int aeApiResize(aeEventLoop *eventLoop, int setsize) {
-    aeApiState *state = eventLoop->apidata;
-
+    aeApiState *state = eventLoop->apidata;  // 获取epoll的状态数据
+    // 调整事件循环文件事件数组大小
     state->events = zrealloc(state->events, sizeof(struct epoll_event)*setsize);
     return 0;
 }
 
+/* 释放事件循环系统底层调用的API使用的数据 */
 static void aeApiFree(aeEventLoop *eventLoop) {
-    aeApiState *state = eventLoop->apidata;
+    aeApiState *state = eventLoop->apidata;  // 获取epoll的状态数据
 
     close(state->epfd);
     zfree(state->events);
     zfree(state);
 }
 
+/* 在事件循环中增加一个文件描述符监听 */
 static int aeApiAddEvent(aeEventLoop *eventLoop, int fd, int mask) {
-    aeApiState *state = eventLoop->apidata;
+    aeApiState *state = eventLoop->apidata;  // 获取epoll的状态数据
     struct epoll_event ee = {0}; /* avoid valgrind warning */
     /* If the fd was already monitored for some event, we need a MOD
      * operation. Otherwise we need an ADD operation. */
+    /* 如果文件描述符已经对某些事件进行监视，我们执行修改操作。否则我们执行添加操作。 */
     int op = eventLoop->events[fd].mask == AE_NONE ?
             EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 
@@ -87,8 +98,9 @@ static int aeApiAddEvent(aeEventLoop *eventLoop, int fd, int mask) {
     return 0;
 }
 
+/* 在事件循环中删除一个文件描述符监听 */
 static void aeApiDelEvent(aeEventLoop *eventLoop, int fd, int delmask) {
-    aeApiState *state = eventLoop->apidata;
+    aeApiState *state = eventLoop->apidata;  // 获取epoll的状态数据
     struct epoll_event ee = {0}; /* avoid valgrind warning */
     int mask = eventLoop->events[fd].mask & (~delmask);
 
@@ -105,8 +117,9 @@ static void aeApiDelEvent(aeEventLoop *eventLoop, int fd, int delmask) {
     }
 }
 
+/* 调用底层API */
 static int aeApiPoll(aeEventLoop *eventLoop, struct timeval *tvp) {
-    aeApiState *state = eventLoop->apidata;
+    aeApiState *state = eventLoop->apidata;  // 获取epoll的状态数据
     int retval, numevents = 0;
 
     retval = epoll_wait(state->epfd,state->events,eventLoop->setsize,
@@ -130,6 +143,7 @@ static int aeApiPoll(aeEventLoop *eventLoop, struct timeval *tvp) {
     return numevents;
 }
 
+/* 获取底层I/O具体使用的API名称，这里是epoll */
 static char *aeApiName(void) {
     return "epoll";
 }

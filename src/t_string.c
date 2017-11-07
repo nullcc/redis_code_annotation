@@ -27,6 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* 字符串命令 */
+
 #include "server.h"
 #include <math.h> /* isnan(), isinf() */
 
@@ -34,6 +36,7 @@
  * String Commands
  *----------------------------------------------------------------------------*/
 
+/* 判断一个长度是否为合法的字符串长度，字符串最大512MB */
 static int checkStringLength(client *c, long long size) {
     if (size > 512*1024*1024) {
         addReplyError(c,"string exceeds maximum allowed size (512MB)");
@@ -58,41 +61,67 @@ static int checkStringLength(client *c, long long size) {
  * If ok_reply is NULL "+OK" is used.
  * If abort_reply is NULL, "$-1" is used. */
 
+/* setGenericCommand()函数实现了SET操作，可以使用各种选项，还有一些SET操作的变体。
+ * 此函数在下列命令中会被调用：SET, SETEX, PSETEX, SETNX。
+ * 
+ * 'flags'会改变命令的行为（比如NX或XX）。
+ * 
+ * 'expire'表示用户对一个Redis对象设置的过期时间。它的大小依赖于指定的'unit'。
+ * 
+ * 'ok_reply'和'abort_reply'表示如果操作成功执行，函数要返回给用户的信息。
+ * 
+ * 如果ok_reply为NULL，会使用"+OK"。
+ * 如果abort_reply为NULL，会使用"$-1"。 */
+
+// 没有flags
 #define OBJ_SET_NO_FLAGS 0
+
+// 当key不存在时设置value
 #define OBJ_SET_NX (1<<0)     /* Set if key not exists. */
+
+// 当key存在时设置value
 #define OBJ_SET_XX (1<<1)     /* Set if key exists. */
+
+// 当指定了key的过期时间以秒数给出时指定key的过期时间
 #define OBJ_SET_EX (1<<2)     /* Set if time in seconds is given */
+
+// 当指定了key的过期时间以毫秒数给出时指定key的过期时间
 #define OBJ_SET_PX (1<<3)     /* Set if time in ms in given */
 
+/* set key-value pair的通用函数 */
 void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire, int unit, robj *ok_reply, robj *abort_reply) {
     long long milliseconds = 0; /* initialized to avoid any harmness warning */
 
+    // 将入参expire（一个redis对象）转化为以毫秒表示的过期时间
     if (expire) {
         if (getLongLongFromObjectOrReply(c, expire, &milliseconds, NULL) != C_OK)
             return;
-        if (milliseconds <= 0) {
+        if (milliseconds <= 0) {  // 过期时间不可以小于或等于0
             addReplyErrorFormat(c,"invalid expire time in %s",c->cmd->name);
             return;
         }
-        if (unit == UNIT_SECONDS) milliseconds *= 1000;
+        if (unit == UNIT_SECONDS) milliseconds *= 1000;  // 判断过期时间的单位，并处理过期时间
     }
 
+    // 选项为NX却发现存在该key或选项为XX却不存在该key，都不做处理
     if ((flags & OBJ_SET_NX && lookupKeyWrite(c->db,key) != NULL) ||
         (flags & OBJ_SET_XX && lookupKeyWrite(c->db,key) == NULL))
     {
         addReply(c, abort_reply ? abort_reply : shared.nullbulk);
         return;
     }
-    setKey(c->db,key,val);
+    setKey(c->db,key,val);  // 设置key-value pair
     server.dirty++;
-    if (expire) setExpire(c->db,key,mstime()+milliseconds);
-    notifyKeyspaceEvent(NOTIFY_STRING,"set",key,c->db->id);
-    if (expire) notifyKeyspaceEvent(NOTIFY_GENERIC,
+    if (expire) setExpire(c->db,key,mstime()+milliseconds);  // 设置key的过期时间
+    notifyKeyspaceEvent(NOTIFY_STRING,"set",key,c->db->id);  // 设置键的set事件通知
+    if (expire) notifyKeyspaceEvent(NOTIFY_GENERIC,  // 设置键的过期事件通知
         "expire",key,c->db->id);
-    addReply(c, ok_reply ? ok_reply : shared.ok);
+    addReply(c, ok_reply ? ok_reply : shared.ok);  // 响应客户端
 }
 
 /* SET key value [NX] [XX] [EX <seconds>] [PX <milliseconds>] */
+/* set命令实现
+ * 用法：SET key value */
 void setCommand(client *c) {
     int j;
     robj *expire = NULL;
@@ -139,21 +168,28 @@ void setCommand(client *c) {
     setGenericCommand(c,flags,c->argv[1],c->argv[2],expire,unit,NULL,NULL);
 }
 
+/* setnx命令，key不存在时设置value
+ * 用法：SETNX key value */
 void setnxCommand(client *c) {
     c->argv[2] = tryObjectEncoding(c->argv[2]);
     setGenericCommand(c,OBJ_SET_NX,c->argv[1],c->argv[2],NULL,0,shared.cone,shared.czero);
 }
 
+/* setex命令，设置key的value和过期时间，时间单位为秒
+ * 用法：SETEX key seconds value */
 void setexCommand(client *c) {
     c->argv[3] = tryObjectEncoding(c->argv[3]);
     setGenericCommand(c,OBJ_SET_NO_FLAGS,c->argv[1],c->argv[3],c->argv[2],UNIT_SECONDS,NULL,NULL);
 }
 
+/* psetex命令，设置key的value和过期时间，时间单位为毫秒 
+ * 用法：PSETEX key milliseconds value*/
 void psetexCommand(client *c) {
     c->argv[3] = tryObjectEncoding(c->argv[3]);
     setGenericCommand(c,OBJ_SET_NO_FLAGS,c->argv[1],c->argv[3],c->argv[2],UNIT_MILLISECONDS,NULL,NULL);
 }
 
+/* get key通用命令 */
 int getGenericCommand(client *c) {
     robj *o;
 
@@ -169,10 +205,14 @@ int getGenericCommand(client *c) {
     }
 }
 
+/* get key命令，内部调用getGenericCommand()函数 
+ * 用法：GET key*/
 void getCommand(client *c) {
     getGenericCommand(c);
 }
 
+/* getset命令，设置键的字符串值并返回其旧值。 
+ * 用法：GETSET key value */
 void getsetCommand(client *c) {
     if (getGenericCommand(c) == C_ERR) return;
     c->argv[2] = tryObjectEncoding(c->argv[2]);
@@ -181,6 +221,8 @@ void getsetCommand(client *c) {
     server.dirty++;
 }
 
+/* setrange命令，在指定偏移处开始的键处覆盖字符串的一部分 
+ * 用法：SETRANGE key offset value */
 void setrangeCommand(client *c) {
     robj *o;
     long offset;
@@ -241,6 +283,8 @@ void setrangeCommand(client *c) {
     addReplyLongLong(c,sdslen(o->ptr));
 }
 
+/* getrange命令，获取存储在键上的字符串的子字符串。 
+ * 用法：GETRANGE key start end */
 void getrangeCommand(client *c) {
     robj *o;
     long long start, end;
@@ -282,16 +326,19 @@ void getrangeCommand(client *c) {
     }
 }
 
+/* mget命令，为多个键分别设置它们的值 
+ * 用法：MGET key1 [key2..] */
 void mgetCommand(client *c) {
     int j;
 
     addReplyMultiBulkLen(c,c->argc-1);
+    // 遍历所有key，获取其value
     for (j = 1; j < c->argc; j++) {
-        robj *o = lookupKeyRead(c->db,c->argv[j]);
-        if (o == NULL) {
+        robj *o = lookupKeyRead(c->db,c->argv[j]);  // 使用key查找对象
+        if (o == NULL) {  // 如果某个key不存在，返回给用户的相应value为空
             addReply(c,shared.nullbulk);
         } else {
-            if (o->type != OBJ_STRING) {
+            if (o->type != OBJ_STRING) {  // key对应的对象不是字符串类型，返回给用户的相应value为空
                 addReply(c,shared.nullbulk);
             } else {
                 addReplyBulk(c,o);
@@ -300,6 +347,7 @@ void mgetCommand(client *c) {
     }
 }
 
+/* mset通用命令 */
 void msetGenericCommand(client *c, int nx) {
     int j, busykeys = 0;
 
@@ -309,12 +357,15 @@ void msetGenericCommand(client *c, int nx) {
     }
     /* Handle the NX flag. The MSETNX semantic is to return zero and don't
      * set nothing at all if at least one already key exists. */
+    /* 处理nx标志。MSETNX命令语义上要在至少有一个key存在时返回0且什么也不做。 */
     if (nx) {
         for (j = 1; j < c->argc; j += 2) {
+            // 遍历所有key，统计已经存在的key的个数
             if (lookupKeyWrite(c->db,c->argv[j]) != NULL) {
                 busykeys++;
             }
         }
+        // 如果至少有一个key已存在，返回0且什么也不做
         if (busykeys) {
             addReply(c, shared.czero);
             return;
@@ -323,43 +374,49 @@ void msetGenericCommand(client *c, int nx) {
 
     for (j = 1; j < c->argc; j += 2) {
         c->argv[j+1] = tryObjectEncoding(c->argv[j+1]);
-        setKey(c->db,c->argv[j],c->argv[j+1]);
-        notifyKeyspaceEvent(NOTIFY_STRING,"set",c->argv[j],c->db->id);
+        setKey(c->db,c->argv[j],c->argv[j+1]);  // 设置key-value pair
+        notifyKeyspaceEvent(NOTIFY_STRING,"set",c->argv[j],c->db->id);  // 设置键的set事件通知
     }
     server.dirty += (c->argc-1)/2;
     addReply(c, nx ? shared.cone : shared.ok);
 }
 
+/* mset命令，为多个键分别设置它们的值，内部调用msetGenericCommand 
+ * 用法：MSET key value [key value …]*/
 void msetCommand(client *c) {
     msetGenericCommand(c,0);
 }
 
+/* msetnx命令，为多个键分别设置它们的值，仅当键不存在时，内部调用msetGenericCommand 
+ * 用法：MSETNX key value [key value …] */
 void msetnxCommand(client *c) {
     msetGenericCommand(c,1);
 }
 
+/* incr/decr命令 */
 void incrDecrCommand(client *c, long long incr) {
     long long value, oldvalue;
     robj *o, *new;
 
-    o = lookupKeyWrite(c->db,c->argv[1]);
+    o = lookupKeyWrite(c->db,c->argv[1]);  // 使用key查找对象
     if (o != NULL && checkType(c,o,OBJ_STRING)) return;
-    if (getLongLongFromObjectOrReply(c,o,&value,NULL) != C_OK) return;
+    if (getLongLongFromObjectOrReply(c,o,&value,NULL) != C_OK) return;  // 获取对象原来的value
 
     oldvalue = value;
+    // 判断对原value增量以后是否溢出
     if ((incr < 0 && oldvalue < 0 && incr < (LLONG_MIN-oldvalue)) ||
         (incr > 0 && oldvalue > 0 && incr > (LLONG_MAX-oldvalue))) {
         addReplyError(c,"increment or decrement would overflow");
         return;
     }
-    value += incr;
+    value += incr;  // 对原value增量
 
     if (o && o->refcount == 1 && o->encoding == OBJ_ENCODING_INT &&
         (value < 0 || value >= OBJ_SHARED_INTEGERS) &&
         value >= LONG_MIN && value <= LONG_MAX)
     {
         new = o;
-        o->ptr = (void*)((long)value);
+        o->ptr = (void*)((long)value);  // 更新对象value
     } else {
         new = createStringObjectFromLongLong(value);
         if (o) {
@@ -369,21 +426,27 @@ void incrDecrCommand(client *c, long long incr) {
         }
     }
     signalModifiedKey(c->db,c->argv[1]);
-    notifyKeyspaceEvent(NOTIFY_STRING,"incrby",c->argv[1],c->db->id);
+    notifyKeyspaceEvent(NOTIFY_STRING,"incrby",c->argv[1],c->db->id);  // 设置键incrby事件通知
     server.dirty++;
-    addReply(c,shared.colon);
-    addReply(c,new);
-    addReply(c,shared.crlf);
+    addReply(c,shared.colon);  // 响应客户端的信息，加冒号
+    addReply(c,new);  // 响应客户端的信息，加新值
+    addReply(c,shared.crlf);  // 响应客户端的信息，加crlf
 }
 
+/* incr命令，将键的整数值增加1，内部调用incrDecrCommand 
+ * 用法：INCR key */
 void incrCommand(client *c) {
     incrDecrCommand(c,1);
 }
 
+/* decr命令，将键的整数值减少1，内部调用incrDecrCommand 
+ * 用法：DECR key*/
 void decrCommand(client *c) {
     incrDecrCommand(c,-1);
 }
 
+/* incrby命令，将键的整数值按给定的数值增加，内部调用incrDecrCommand 
+ * 用法：INCRBY key increment */
 void incrbyCommand(client *c) {
     long long incr;
 
@@ -391,6 +454,8 @@ void incrbyCommand(client *c) {
     incrDecrCommand(c,incr);
 }
 
+/* decrby命令，将键的整数值按给定的数值减少，内部调用incrDecrCommand 
+ * 用法：	DECRBY key decrement */
 void decrbyCommand(client *c) {
     long long incr;
 
@@ -398,6 +463,8 @@ void decrbyCommand(client *c) {
     incrDecrCommand(c,-incr);
 }
 
+/* incrbyfloat命令，将键的浮点值按给定的数值增加
+ * 用法：INCRBYFLOAT key increment */
 void incrbyfloatCommand(client *c) {
     long double incr, value;
     robj *o, *new, *aux;
@@ -432,6 +499,8 @@ void incrbyfloatCommand(client *c) {
     rewriteClientCommandArgument(c,2,new);
 }
 
+/* append命令，用于向指定key的value后面追加值
+ * 用法：APPEND key value */
 void appendCommand(client *c) {
     size_t totlen;
     robj *o, *append;
@@ -465,6 +534,8 @@ void appendCommand(client *c) {
     addReplyLongLong(c,totlen);
 }
 
+/* strlen命令，返回指定key的value的长度 
+ * 用法：STRLEN key */
 void strlenCommand(client *c) {
     robj *o;
     if ((o = lookupKeyReadOrReply(c,c->argv[1],shared.czero)) == NULL ||

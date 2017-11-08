@@ -27,7 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* 字符串命令 */
+/* 字符串API实现 */
 
 #include "server.h"
 #include <math.h> /* isnan(), isinf() */

@@ -494,6 +494,7 @@ robj *tryObjectEncoding(robj *o) {
 
 /* Get a decoded version of an encoded object (returned as a new object).
  * If the object is already raw-encoded just increment the ref count. */
+/* 将对象o转换成字符串对象 */
 robj *getDecodedObject(robj *o) {
     robj *dec;
 

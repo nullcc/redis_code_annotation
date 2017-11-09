@@ -27,6 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* Redis db API */
+
 #include "server.h"
 #include "cluster.h"
 

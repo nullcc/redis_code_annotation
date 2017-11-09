@@ -18,6 +18,7 @@ Reids版本：3.2.11
 | intset.h 和 intset.c | 整数集合 | 100%
 | ziplist.h 和 ziplist.c | 压缩链表 | 100%
 | zipmap.h 和 zipmap.c | 压缩字典 | 100%
+| server.h（2.8版本之前是redis.h）中的zskiplist结构和zskiplistNode结构，以及t_zset.c中所有以zsl开头的函数 | 跳跃表 | 100%
 
 ### 2.Redis数据类型实现
 
@@ -25,7 +26,7 @@ Reids版本：3.2.11
 |:------------------|:------------------|:------------------
 | object.c  | Redis对象（类型）系统实现 | 100%
 | t_string.c  | 字符串键的实现 | 100%
-| t_list.c  | 列表键的实现 | 
+| t_list.c  | 列表键的实现 | 100%
 | t_hash.c  | 散列键的实现 | 
 | t_set.c  | 集合键的实现 | 
 | t_zset.c  | 有序集合键的实现 | 
@@ -56,5 +57,5 @@ Reids版本：3.2.11
 
 |  文件名  | 描述    | 完成情况
 |:------------------|:------------------|:------------------
-| server.h 和 server.c | 服务器实现 | 
+| server.h 和 server.c | Redis服务器实现 | 
 | db.c | C语言级别的DB API | 

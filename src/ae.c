@@ -542,7 +542,7 @@ int aeWait(int fd, int mask, long long milliseconds) {
     }
 }
 
-/* 事件循环主函数 */
+/* 主事件循环函数 */
 void aeMain(aeEventLoop *eventLoop) {
     eventLoop->stop = 0;  // 设置事件循环为运行状态
     while (!eventLoop->stop) {

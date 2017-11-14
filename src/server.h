@@ -189,24 +189,57 @@ typedef long long mstime_t; /* millisecond time type. */
 #define CMD_FAST 8192                 /* "F" flag */
 
 /* Object types */
+/* 对象类型 */
+
+// 字符串对象
 #define OBJ_STRING 0
+
+// 列表对象
 #define OBJ_LIST 1
+
+// 集合对象
 #define OBJ_SET 2
+
+// 有序集合对象
 #define OBJ_ZSET 3
+
+// 哈希表对象
 #define OBJ_HASH 4
 
 /* Objects encoding. Some kind of objects like Strings and Hashes can be
  * internally represented in multiple ways. The 'encoding' field of the object
  * is set to one of this fields for this object. */
+/* 对象编码。一些对象比如字符串和哈希表在内部可以以不同的方式实现。这些对象的'encoding'字段
+ * 是下面的其中一个。 */
+
+// 原始编码
 #define OBJ_ENCODING_RAW 0     /* Raw representation */
+
+// 整型编码
 #define OBJ_ENCODING_INT 1     /* Encoded as integer */
+
+// 哈希表编码
 #define OBJ_ENCODING_HT 2      /* Encoded as hash table */
+
+// 压缩字典编码
 #define OBJ_ENCODING_ZIPMAP 3  /* Encoded as zipmap */
+
+// 链表编码
 #define OBJ_ENCODING_LINKEDLIST 4 /* Encoded as regular linked list */
+
+// 压缩链表编码
 #define OBJ_ENCODING_ZIPLIST 5 /* Encoded as ziplist */
+
+// 整数集合编码
 #define OBJ_ENCODING_INTSET 6  /* Encoded as intset */
+
+// 跳跃表编码
 #define OBJ_ENCODING_SKIPLIST 7  /* Encoded as skiplist */
+
+// 嵌入式字符串编码
 #define OBJ_ENCODING_EMBSTR 8  /* Embedded sds string encoding */
+
+// quicklist编码
 #define OBJ_ENCODING_QUICKLIST 9 /* Encoded as linked list of ziplists */
 
 /* Defines related to the dump file format. To store 32 bits lengths for short
@@ -457,21 +490,32 @@ typedef long long mstime_t; /* millisecond time type. */
 /* A redis object, that is a type able to hold a string / list / set */
 
 /* The actual Redis Object */
+
+// LRU时钟占用的位数
 #define LRU_BITS 24
+
+// LRU时钟最大值
 #define LRU_CLOCK_MAX ((1<<LRU_BITS)-1) /* Max value of obj->lru */
+
+// LRU时钟分辨率为毫秒
 #define LRU_CLOCK_RESOLUTION 1000 /* LRU clock resolution in ms */
+
+// redis对象结构体
 typedef struct redisObject {
-    unsigned type:4;
-    unsigned encoding:4;
-    unsigned lru:LRU_BITS; /* lru time (relative to server.lruclock) */
-    int refcount;
-    void *ptr;
+    unsigned type:4;  // 对象类型
+    unsigned encoding:4;  // 对象编码
+    unsigned lru:LRU_BITS; /* lru time (relative to server.lruclock) */  // LRU时间
+    int refcount;  // 对象引用计数
+    void *ptr;  // 对象的数据指针
 } robj;
 
 /* Macro used to obtain the current LRU clock.
  * If the current resolution is lower than the frequency we refresh the
  * LRU clock (as it should be in production servers) we return the
  * precomputed value, otherwise we need to resort to a system call. */
+/* 获取当前的LRU时钟。
+ * 如果当前的精度小于服务器的频率，我们刷新LRU时钟（在生产服务器上应该这么做），
+ * 返回一个预先计算好的值，否则我们需要进行一个系统调用。 */
 #define LRU_CLOCK() ((1000/server.hz <= LRU_CLOCK_RESOLUTION) ? server.lruclock : getLRUClock())
 
 /* Macro used to initialize a Redis object allocated on the stack.
@@ -501,14 +545,31 @@ struct evictionPoolEntry {
 /* Redis database representation. There are multiple databases identified
  * by integers from 0 (the default database) up to the max configured
  * database. The database number is the 'id' field in the structure. */
+/* Redis数据库结构体。这里有多个使用整数标识的数据库，编号从0到配置的最大值。
+ * 数据库编号即为结构体的id域。 */
 typedef struct redisDb {
+    // db的键空间字典
     dict *dict;                 /* The keyspace for this DB */
+
+    // 配置了过期事件的键字典
     dict *expires;              /* Timeout of keys with a timeout set */
+
+    // 阻塞客户端的key字典
     dict *blocking_keys;        /* Keys with clients waiting for data (BLPOP) */
+
+    // 就绪key字典
     dict *ready_keys;           /* Blocked keys that received a PUSH */
+
+    // 使用MULTI/EXEC监控的key字典
     dict *watched_keys;         /* WATCHED keys for MULTI/EXEC CAS */
+
+    // 
     struct evictionPoolEntry *eviction_pool;    /* Eviction pool of keys */
+
+    // 数据库id
     int id;                     /* Database ID */
+
+    // 平均TTL
     long long avg_ttl;          /* Average TTL, just for stats */
 } redisDb;
 

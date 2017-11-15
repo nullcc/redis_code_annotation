@@ -351,12 +351,12 @@ long long timeInMilliseconds(void) {
 
 /* Rehash for an amount of time between ms milliseconds and ms+1 milliseconds */
 
-/*  在ms时间内rehash，超过则停止 */
+/* 在ms时间内rehash，超过则停止 */
 int dictRehashMilliseconds(dict *d, int ms) {
     long long start = timeInMilliseconds();  // 起始时间
     int rehashes = 0; // rehash次数
 
-    while(dictRehash(d,100)) {  // 分100rehash
+    while(dictRehash(d,100)) {  // 分100步rehash
         rehashes += 100;
         if (timeInMilliseconds()-start > ms) break;  // 超过规定时间则停止rehash
     }

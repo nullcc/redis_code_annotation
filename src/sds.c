@@ -200,7 +200,7 @@ void sdsfree(sds s) {
  * remains 6 bytes. */
 
 /* 使用通过strlen()获取的sds字符串长度来设置sds字符串的长度，
- * 所以只考虑到第一个空字符钱的字符串长度。
+ * 所以只考虑到第一个空字符前的字符串长度。
  * 
  * 当sds字符串被手动修改的时候这个函数很有用，比如下面的例子：
  * 
@@ -222,7 +222,7 @@ void sdsupdatelen(sds s) {
  * so that next append operations will not require allocations up to the
  * number of bytes previously available. */
 
-/* 就地修改一个sds字符串为空（长度围为0）。
+/* 就地修改一个sds字符串为空（长度为0）。
  * 然而，所有当前的缓冲区都不会被释放，而是设置成空闲空间，
  * 所以下一次追加操作可以使用原来的空闲空间而不需要分配空间。 */
 void sdsclear(sds s) {

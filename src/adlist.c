@@ -59,7 +59,7 @@ list *listCreate(void)
  *
  * This function can't fail. */
 
- /* 释放整个链表
+/* 释放整个链表
  *
  * 此函数不能失败。 */
 void listRelease(list *list)
@@ -85,7 +85,7 @@ void listRelease(list *list)
  * list remains unaltered).
  * On success the 'list' pointer you pass to the function is returned. */
 
- /* 在链表头添加一个数据域包含指向'value'指针的新节点。
+/* 在链表头添加一个数据域包含指向'value'指针的新节点。
  * 
  * 出错时，会返回NULL且不会执行任何操作(链表不会有任何改变)。
  * 成功时，会返回你传入的'list'指针。*/
@@ -116,7 +116,7 @@ list *listAddNodeHead(list *list, void *value)
  * list remains unaltered).
  * On success the 'list' pointer you pass to the function is returned. */
 
- /* 在链表尾添加一个数据域包含指向'value'指针的新节点。
+/* 在链表尾添加一个数据域包含指向'value'指针的新节点。
  * 
  * 出错时，会返回NULL且不会执行任何操作(链表不会有任何改变)。
  * 成功时，会返回你传入的'list'指针。*/
@@ -140,7 +140,7 @@ list *listAddNodeTail(list *list, void *value)
     return list;
 }
 
- /* 插入新节点到链表中某个节点的指定位置(前/后) */
+/* 插入新节点到链表中某个节点的指定位置(前/后) */
 list *listInsertNode(list *list, listNode *old_node, void *value, int after) {
     listNode *node;
 
@@ -175,7 +175,7 @@ list *listInsertNode(list *list, listNode *old_node, void *value, int after) {
  *
  * This function can't fail. */
 
- /* 从指定链表中移除指定节点。
+/* 从指定链表中移除指定节点。
  *
  * 此函数不能失败。 */
 void listDelNode(list *list, listNode *node)
@@ -198,7 +198,7 @@ void listDelNode(list *list, listNode *node)
  *
  * This function can't fail. */
 
- /* 返回一个链表的迭代器'iter'。初始化之后每次调用listNext()函数都会返回链表的下一个元素。
+/* 返回一个链表的迭代器'iter'。初始化之后每次调用listNext()函数都会返回链表的下一个元素。
  *
  * 此函数不能失败。 */
 listIter *listGetIterator(list *list, int direction)

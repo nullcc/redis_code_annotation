@@ -446,7 +446,7 @@ void sdsIncrLen(sds s, int incr) {
  * if the specified length is smaller than the current length, no operation
  * is performed. */
 
-/* 增长一个sds字符串到一个指定长度。扩充出来的不是原来字符串的空间会被设置为0。ß
+/* 增长一个sds字符串到一个指定长度。扩充出来的不是原来字符串的空间会被设置为0。
  *
  * 如果指定的长度比当前长度小，不做任何操作。*/
 sds sdsgrowzero(sds s, size_t len) {

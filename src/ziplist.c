@@ -25,6 +25,15 @@
  * <zlend> is a single byte special value, equal to 255, which indicates the
  * end of the list.
  *
+ * ziplist的结构：
+ * <zlbytes><zltail><zllen><entry><entry><zlend>
+ * 这几个部分的含义如下：
+ * <zlbytes>：一个无符号整数，表示ziplist所占用的字节数。这个值让我们在调整ziplist的大小时无须先遍历它获得其大小。
+ * <zltail>：链表中最后一个元素的偏移量。保存这个值可以让我们从链表尾弹出元素而无须遍历整个链表找到最后一个元素的位置。
+ * <zllen>：链表中的元素个数。当这个值大于2**16-2时，我们需要遍历真个链表计算出链表中的元素数量。
+ * <entry>：链表中的节点。稍后会详细说明节点的数据结构。
+ * <zlend>：一个拥有特殊值`255`的字节，它标识链表结束。
+
  * ZIPLIST ENTRIES:
  * Every entry in the ziplist is prefixed by a header that contains two pieces
  * of information. First, the length of the previous entry is stored to be
@@ -46,6 +55,19 @@
  * integer will be stored after this header. An overview of the different
  * types and encodings is as follows:
  *
+ * ziplist中每个节点都有一个header作为前缀，其中包含了两个字段。首先是前一个节点的长度，
+ * 这个信息可以允许我们从后向前遍历ziplist。第二个字段是节点的编码和节点存储的字符串长度。
+ *
+ * 前一个节点的长度使用如下方式来编码：
+ *
+ * 如果前一个节点的长度小于254字节，保存前一个节点的长度只需消耗1字节，长度值就是它的值。
+ * 如果前一个节点长度大于或等于254，编码它将占用5字节。其中第一个字节的值是254，用来标识后面有一个更大的值，
+ * 其余4个字节的值就表示前一个节点的长度。
+ * 
+ * header中另一个字段的值依赖于节点的值。当节点的值是一个字符串，前两个bit将保存用于存储字符串长度的编码类型，
+ * 后面是字符串的实际长度。当节点的值是一个整数时，前两个bit都为1。之后的两个bit用来指出节点header后保存的整数的类型。
+ * 下面是不同类型和编码的一个概括：
+ * 
  * |00pppppp| - 1 byte
  *      String value with length less than or equal to 63 bytes (6 bits).
  * |01pppppp|qqqqqqqq| - 2 bytes
@@ -70,6 +92,27 @@
  *
  * All the integers are represented in little endian byte order.
  *
+ * |00pppppp| - 1 byte
+ *   长度小于或等于63字节(2^6-1字节)的字符串，保存其长度需要6 bits。
+ * |01pppppp|qqqqqqqq| - 2 bytes
+ *   长度小于或等于16383字节(2^14-1字节)的字符串，保存其长度需要14 bits。
+ * |10______|qqqqqqqq|rrrrrrrr|ssssssss|tttttttt| - 5 bytes
+ *   长度大于或等于16384字节的字符串，第一个byte的第3~8个bit的值没有含义，第一个byte后的2~5个bytes保存了其长度。
+ * |11000000| - 1 byte
+ *   使用`int16_t`编码的整数，这个整数占用2字节。
+ * |11010000| - 1 byte
+ *   使用`int32_t`编码的整数，这个整数占用4字节。
+ * |11100000| - 1 byte
+ *   使用`int64_t`编码的整数，这个整数占用8字节。
+ * |11110000| - 1 byte
+ *   使用24 bits编码的整数，这个整数占用3字节。
+ * |11111110| - 1 byte
+ *   使用8 bits编码的整数，这个整数占用1字节。
+ * |1111xxxx| - (其中xxxx的取值在0000~1101之间)
+ *   表示一个4 bit整数立即编码，表示的无符号整数范围为0~12。但实际能编码的值为1(0001)~13(1101)，因为0000和1111不能使用。
+ * |11111111| - ziplist的结束符
+ *
+ * 注意：所有整数都已小端字节序表示。
  * ----------------------------------------------------------------------------
  *
  * Copyright (c) 2009-2012, Pieter Noordhuis <pcnoordhuis at gmail dot com>
@@ -117,7 +160,7 @@
 #define ZIP_BIGLEN 254
 
 /* Different encoding/length possibilities */
-/* 不同得编码/长度 */
+/* 不同的编码/长度 */
 
 // 字符串掩码 11000000
 #define ZIP_STR_MASK 0xc0

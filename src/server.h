@@ -712,7 +712,7 @@ typedef struct zskiplistNode {
 // 有序集合跳跃表结构
 typedef struct zskiplist {
     struct zskiplistNode *header, *tail;  // 跳跃表表头节点指针和表尾节点指针
-    unsigned long length;  // 跳跃表的长度，即跳跃表当前的节点数量（表头节点的层数不算在内）
+    unsigned long length;  // 跳跃表的长度，即跳跃表当前的节点数量（表头节点不算在内）
     int level;  // 当前跳跃表中层数最大的节点的层数（表头节点的层数不算在内）
 } zskiplist;
 
